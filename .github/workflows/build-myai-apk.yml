@@ -19,7 +19,7 @@ jobs:
         run: |
           set -e
 
-          ZIP="./MyAI_Offline_realme8_v0.6.5_FINAL.zip"
+          ZIP="./MyAI_Offline_realme8_v0.6.6_FINAL.zip"
 
           if [ ! -f "$ZIP" ]; then
             echo "ZIP project not found: $ZIP"
