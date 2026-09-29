@@ -38,6 +38,7 @@ jobs:
           grep -q 'versionCode = 800' app/build.gradle.kts
           grep -q 'sherpa-onnx:sherpa-onnx:v1.13.8' app/build.gradle.kts
           grep -q 'commons-compress:1.28.0' app/build.gradle.kts
+          grep -q 'https://jitpack.io' settings.gradle.kts
           test -f app/src/main/java/com/dmitry/myai/NeuralVoiceManager.kt
           test -f app/src/main/java/com/dmitry/myai/NeuralTtsController.kt
           echo "v0.8 source verification passed"
