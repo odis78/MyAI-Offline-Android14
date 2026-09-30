@@ -44,6 +44,7 @@ jobs:
           test -f app/src/main/java/com/dmitry/myai/NeuralVoiceManager.kt
           test -f app/src/main/java/com/dmitry/myai/NeuralTtsController.kt
           test -f app/src/main/java/com/dmitry/myai/RealmePerformanceProfile.kt
+          test -f app/src/main/java/com/dmitry/myai/DeviceBenchmark.kt
           echo "v0.8 Вторая ветка source verification passed"
 
       - name: Set up JDK 17
