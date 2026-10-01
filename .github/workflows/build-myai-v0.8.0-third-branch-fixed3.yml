@@ -1,0 +1,110 @@
+name: Build MyAI realme 8 v0.8 — Третья ветка
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find and unpack Third Branch source
+        shell: bash
+        run: |
+          set -e
+          # Find the uploaded Third Branch ZIP by pattern, so FIXED/FIXED2/etc.
+          # suffixes never break the build again. Ignore GitHub's hidden folders.
+          ZIP=""
+          for candidate in ./MyAI_Offline_realme8_v0.8.0_NEURAL_VOICE_THIRD_BRANCH*.zip; do
+            if [ -f "$candidate" ]; then
+              ZIP="$candidate"
+              break
+            fi
+          done
+          if [ -z "$ZIP" ]; then
+            echo "Source ZIP not found. Expected MyAI_Offline_realme8_v0.8.0_NEURAL_VOICE_THIRD_BRANCH*.zip"
+            echo "Repository files:"
+            ls -la
+            exit 1
+          fi
+          echo "Using source: $ZIP"
+          rm -rf source
+          mkdir -p source
+          unzip -q "$ZIP" -d source
+          PROJECT_DIR="$(find source -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$PROJECT_DIR"
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Source checks
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+          chmod +x gradlew sanity_check.sh
+          grep -q 'versionCode = 800' app/build.gradle.kts
+          grep -q 'versionName = "0.8.0-neural-voice-realme8"' app/build.gradle.kts
+          test -f app/src/main/java/com/dmitry/myai/AgentToolSchema.kt
+          test -f app/src/main/java/com/dmitry/myai/LlamaEngine.kt
+          grep -q 'openSession' app/src/main/java/com/dmitry/myai/LlamaEngine.kt
+          ! grep -qs 'runAgentLoop' app/src/main/java/com/dmitry/myai/ChatViewModel.kt
+          grep -q 'agentLoop.run' app/src/main/java/com/dmitry/myai/ChatViewModel.kt
+          test -f app/src/main/java/com/dmitry/myai/AgentLoop.kt
+          test -f app/src/main/java/com/dmitry/myai/AgentTrace.kt
+          test -f app/src/main/java/com/dmitry/myai/Observation.kt
+          test -f app/src/main/java/com/dmitry/myai/ToolRegistry.kt
+          grep -q 'registry.execute' app/src/main/java/com/dmitry/myai/ToolManager.kt
+          grep -q 'offlineAsr.isInstalled()' app/src/main/java/com/dmitry/myai/VoiceController.kt
+          ./sanity_check.sh
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 34
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+          gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK ABI and manifest
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
+          unzip -l "$APK" | grep -Eq 'lib/arm64-v8a/.*(llama|sherpa).*\.so'
+          echo "APK exists and arm64-v8a native libraries are packaged."
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyAI-v0.8.0-Third-Branch-debug
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
