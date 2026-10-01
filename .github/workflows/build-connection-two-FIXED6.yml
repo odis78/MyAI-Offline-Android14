@@ -1,0 +1,216 @@
+name: Build Connection Two APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Connection Two APK
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify Android SDK tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -d "$ANDROID_SDK_ROOT"
+
+          SDKMANAGER=""
+          if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+
+          test -n "$SDKMANAGER"
+          echo "sdkmanager: $SDKMANAGER"
+          "$SDKMANAGER" --version
+
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDKMANAGER=""
+          if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
+
+      - name: Install Android 34 components
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDKMANAGER=""
+          if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Prepare Android project
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf connection_source
+          mkdir -p connection_source
+
+          # Case 1: the Android project is already checked out directly.
+          if { [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; } && [ -f "gradlew" ]; then
+            PROJECT_DIR="."
+          else
+            # Case 2: the repository contains the project as a ZIP.
+            ZIP=""
+
+            for candidate in \
+              ./MyAI_Connection_Two_v1.0.0_FIXED1.zip \
+              ./MyAI_Connection_Two_v1.0.0_READY.zip \
+              ./MyAI_Connection_Two_v1.0.0_FINAL.zip \
+              ./MyAI_Connection_Two_v1.0.0_WITH_BUILD_WORKFLOW.zip \
+              ./MyAI_Connection_Two_v1.0.0_FIXED.zip \
+              ./MyAI_Connection_Two_v1.0.0.zip \
+              ./MyAI_Connection_Two*.zip; do
+              if [ -f "$candidate" ]; then
+                ZIP="$candidate"
+                break
+              fi
+            done
+
+            # Also search one level deeper if the ZIP is not in the repository root.
+            if [ -z "$ZIP" ]; then
+              ZIP="$(find . -maxdepth 3 -type f \
+                \( -iname 'MyAI_Connection_Two*.zip' -o -iname '*Connection*Two*.zip' \) \
+                -print -quit)"
+            fi
+
+            if [ -z "$ZIP" ]; then
+              echo "ERROR: Android project was not found."
+              echo "Expected either:"
+              echo "  - settings.gradle.kts + gradlew in repository root, or"
+              echo "  - MyAI_Connection_Two*.zip in the repository."
+              echo ""
+              echo "Repository files:"
+              find . -maxdepth 3 -type f -print | sort
+              exit 1
+            fi
+
+            echo "Using source ZIP: $ZIP"
+            unzip -q "$ZIP" -d connection_source
+
+            SETTINGS_FILE="$(find connection_source -type f \
+              \( -name 'settings.gradle.kts' -o -name 'settings.gradle' \) \
+              -print -quit)"
+
+            if [ -z "$SETTINGS_FILE" ]; then
+              echo "ERROR: ZIP was found, but no Gradle settings file exists inside it."
+              echo "Gradle files found:"
+              find connection_source -type f \
+                \( -name 'settings.gradle.kts' -o -name 'settings.gradle' \
+                   -o -name 'build.gradle.kts' -o -name 'build.gradle' -o -name 'gradlew' \) \
+                -print | sort
+              exit 1
+            fi
+
+            PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          fi
+
+          if [ "$PROJECT_DIR" = "." ]; then
+            PROJECT_DIR_ABS="$GITHUB_WORKSPACE"
+          else
+            PROJECT_DIR_ABS="$GITHUB_WORKSPACE/${PROJECT_DIR#./}"
+          fi
+
+          test -f "$PROJECT_DIR_ABS/gradlew"
+          test -f "$PROJECT_DIR_ABS/app/build.gradle.kts" || \
+            test -f "$PROJECT_DIR_ABS/app/build.gradle"
+
+          echo "Android project: $PROJECT_DIR_ABS"
+          echo "project_dir=$PROJECT_DIR_ABS" >> "$GITHUB_OUTPUT"
+
+          echo "Project root contents:"
+          find "$PROJECT_DIR_ABS" -maxdepth 2 -type f | sort | head -n 120
+
+      - name: Static project checks
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f app/src/main/AndroidManifest.xml
+          grep -q 'com.openai.chatgpt' app/src/main/AndroidManifest.xml
+
+          CHAT_BRIDGE="app/src/main/java/com/dmitry/myai/ChatGptBridge.kt"
+          test -f "$CHAT_BRIDGE"
+          grep -q 'ACTION_SEND' "$CHAT_BRIDGE"
+          grep -q 'com.openai.chatgpt' "$CHAT_BRIDGE"
+
+          MAIN="app/src/main/java/com/dmitry/myai/MainActivity.kt"
+          test -f "$MAIN"
+          grep -q 'onOpenChatGpt: () -> Unit' "$MAIN"
+          grep -q 'onSendToChatGpt: (String) -> Unit' "$MAIN"
+          grep -q 'ChatGptBridge.open' "$MAIN"
+          grep -q 'ChatGptBridge.sendText' "$MAIN"
+
+          echo "Static project checks passed."
+
+      - name: Prepare Gradle wrapper
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Build debug APK
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Verify APK
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+
+          echo "APK successfully built:"
+          ls -lh "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyAI-Connection-Two-debug-apk
+          path: ${{ steps.project.outputs.project_dir }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
