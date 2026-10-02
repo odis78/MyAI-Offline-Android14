@@ -33,7 +33,8 @@ jobs:
           set -euo pipefail
           rm -rf source
           ZIP="./ChatGPT_Control_Bridge_v0.1.0_FIXED11.zip"
-          test -f "$ZIP"
+          test -s "$ZIP"
+          unzip -tq "$ZIP"
           mkdir -p source
           unzip -q "$ZIP" -d source
           SETTINGS_FILE=$(find source -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print -quit)
@@ -51,9 +52,13 @@ jobs:
           grep -q 'FIXED11' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'lastTargetPackage' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'isIgnoredWindowPackage' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'resolveTargetPackage' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'com.coloros.smartsidebar' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'com.oplus.leftscreen' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'com.google.android.inputmethod.latin' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'TARGET ROOT NOT FOUND' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
-          grep -q 'BACK: no safe target-specific back control' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'BACK: Bridge is foreground; no unsafe GLOBAL_BACK' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          ! grep -q 'ACTION BACK AFTER FOCUS' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'R.id.logScroll' app/src/main/java/com/example/chatgptbridge/MainActivity.java
           grep -q 'fullScroll(View.FOCUS_DOWN)' app/src/main/java/com/example/chatgptbridge/MainActivity.java
           grep -q 'android:id="@+id/logScroll"' app/src/main/res/layout/activity_main.xml
@@ -61,6 +66,8 @@ jobs:
           grep -q 'compileSdk 35' app/build.gradle
           grep -q 'targetSdk 35' app/build.gradle
           grep -q 'versionName.*FIXED11' app/build.gradle
+          grep -q 'versionCode 11' app/build.gradle
+          grep -q "rootProject.name='ChatGPT_Control_Bridge_v0.1.0_FIXED11'" settings.gradle
           echo "Static FIXED11 checks passed."
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
