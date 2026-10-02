@@ -74,8 +74,10 @@ jobs:
           grep -q 'ввод текста' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'открыть файл' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'getSelectedFile' app/src/main/java/com/example/chatgptbridge/MainActivity.java
-          grep -q 'FLAG_ACTIVITY_REORDER_TO_FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          ! grep -q 'FLAG_ACTIVITY_REORDER_TO_FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'BACK EXISTING TASK TO FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'BACK TARGET LOST -> RESTORE' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'BACK RESTORE FOREGROUND' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           ! grep -q 'BACK: target launch requested' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           ! grep -q 'ACTION BACK AFTER FOCUS' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'R.id.logScroll' app/src/main/java/com/example/chatgptbridge/MainActivity.java
