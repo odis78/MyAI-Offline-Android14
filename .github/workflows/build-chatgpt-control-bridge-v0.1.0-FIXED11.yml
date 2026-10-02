@@ -30,22 +30,40 @@ jobs:
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Prepare EXACT FIXED11 source
+      - name: Verify and prepare EXACT FIXED11 source
         id: project
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf source
+
           ZIP="./ChatGPT_Control_Bridge_v0.1.0_FIXED11.zip"
+          EXPECTED_SHA256="b757e37b0ca8c4e79b1f1170b6e6c3675ed24864dd5e7d1526b5279a99e42804"
+
           test -s "$ZIP"
+
+          ACTUAL_SHA256="$(sha256sum "$ZIP" | awk '{print $1}')"
+          echo "FIXED11 ZIP SHA256: $ACTUAL_SHA256"
+
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+            echo "::error::Wrong ChatGPT_Control_Bridge_v0.1.0_FIXED11.zip is present in the repository."
+            echo "::error::Expected SHA256: $EXPECTED_SHA256"
+            echo "::error::Actual SHA256:   $ACTUAL_SHA256"
+            exit 1
+          fi
+
+          rm -rf source
           mkdir -p source
           unzip -q "$ZIP" -d source
-          SETTINGS_FILE=$(find source -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print -quit)
+
+          SETTINGS_FILE="$(find source -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print -quit)"
           test -n "$SETTINGS_FILE"
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT_DIR/app/src/main/java/com/example/chatgptbridge/MainActivity.java"
           test -f "$PROJECT_DIR/app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java"
+
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Static FIXED11 checks
@@ -53,16 +71,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           grep -q "rootProject.name='ChatGPT_Control_Bridge_v0.1.0_FIXED11'" settings.gradle
           grep -q "versionName '0.1.0-FIXED11'" app/build.gradle
           grep -q 'versionCode 11' app/build.gradle
           grep -q 'compileSdk 35' app/build.gradle
           grep -q 'targetSdk 35' app/build.gradle
+
           grep -q 'android.permission.BIND_ACCESSIBILITY_SERVICE' app/src/main/AndroidManifest.xml
           grep -q 'android.accessibilityservice.AccessibilityService' app/src/main/AndroidManifest.xml
           grep -q 'flagRetrieveInteractiveWindows' app/src/main/res/xml/accessibility_service_config.xml
           grep -q 'android:canRetrieveWindowContent="true"' app/src/main/res/xml/accessibility_service_config.xml
           grep -q 'android:canPerformGestures="true"' app/src/main/res/xml/accessibility_service_config.xml
+
           grep -q 'getRootInActiveWindow' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'getWindows' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'getSource' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
@@ -73,21 +94,37 @@ jobs:
           grep -q 'dispatchGesture' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'ввод текста' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'открыть файл' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+
           grep -q 'private boolean clickMicrophone' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'findMicrophoneNode' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+
+          # CRITICAL: system camera/gallery commands must be present.
+          grep -q 'handleSystemAppCommand(name)' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'CATEGORY_APP_GALLERY' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'ACTION_IMAGE_CAPTURE' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'MediaStore.Images.Media.EXTERNAL_CONTENT_URI' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'SYSTEM OPEN RESOLVED' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+
+          # CRITICAL: Russian inflection forms must be accepted.
+          grep -q 'n.contains("камер")' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'n.contains("галере")' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+
           grep -q 'getSelectedFile' app/src/main/java/com/example/chatgptbridge/MainActivity.java
+
           ! grep -q 'FLAG_ACTIVITY_REORDER_TO_FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'BACK EXISTING TASK TO FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'BACK TARGET LOST -> RESTORE' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'BACK RESTORE FOREGROUND' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           ! grep -q 'BACK: target launch requested' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           ! grep -q 'ACTION BACK AFTER FOCUS' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+
           grep -q 'R.id.logScroll' app/src/main/java/com/example/chatgptbridge/MainActivity.java
           grep -q 'fullScroll(View.FOCUS_DOWN)' app/src/main/java/com/example/chatgptbridge/MainActivity.java
           grep -q 'android:id="@+id/logScroll"' app/src/main/res/layout/activity_main.xml
+
           echo "Static FIXED11 checks passed."
+          echo "CRITICAL: building the verified FIXED11 ZIP, not an arbitrary source tree."
 
       - name: XML and source sanity checks
         working-directory: ${{ steps.project.outputs.project_dir }}
@@ -96,7 +133,9 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import pathlib, xml.etree.ElementTree as ET
-          root=pathlib.Path('.')
+
+          root = pathlib.Path('.')
+
           for p in [
               root/'app/src/main/AndroidManifest.xml',
               root/'app/src/main/res/xml/accessibility_service_config.xml',
@@ -105,13 +144,15 @@ jobs:
               root/'app/src/main/res/layout/activity_main.xml',
           ]:
               ET.parse(p)
+
           for p in [
               root/'app/src/main/java/com/example/chatgptbridge/MainActivity.java',
               root/'app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java',
           ]:
-              s=p.read_text(encoding='utf-8')
+              s = p.read_text(encoding='utf-8')
               if s.count('{') != s.count('}'):
                   raise SystemExit(f'Unbalanced braces: {p}')
+
           print('XML and source sanity checks passed.')
           PY
 
