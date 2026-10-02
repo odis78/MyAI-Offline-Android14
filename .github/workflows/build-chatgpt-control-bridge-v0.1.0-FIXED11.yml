@@ -73,6 +73,10 @@ jobs:
           grep -q 'dispatchGesture' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'ввод текста' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'открыть файл' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'private boolean clickMicrophone' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'findMicrophoneNode' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'CATEGORY_APP_GALLERY' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'getSelectedFile' app/src/main/java/com/example/chatgptbridge/MainActivity.java
           ! grep -q 'FLAG_ACTIVITY_REORDER_TO_FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'BACK EXISTING TASK TO FRONT' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
