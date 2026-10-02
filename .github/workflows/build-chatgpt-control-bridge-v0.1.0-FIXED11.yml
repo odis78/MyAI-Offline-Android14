@@ -69,7 +69,8 @@ jobs:
           grep -q 'findFocus' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'clearCache' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'runWithTargetRoot' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
-          grep -q 'performGlobalAction(GLOBAL_ACTION_BACK)' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          ! grep -q 'BACK GLOBAL target=' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'global back skipped' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'dispatchGesture' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'ввод текста' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'открыть файл' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
