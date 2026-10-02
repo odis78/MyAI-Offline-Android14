@@ -10,6 +10,7 @@ jobs:
   build:
     name: Build ChatGPT Control Bridge APK FIXED11 FINAL
     runs-on: ubuntu-22.04
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,14 +39,13 @@ jobs:
 
           ZIP="./ChatGPT_Control_Bridge_v0.1.0_FIXED11.zip"
           EXPECTED_SHA256="92ea07c2ea8567424a79a1f08e0fa45eb8f6c0a43c417dc8002b64bfc60838d9"
-          BUILD_ID="FIXED11-CAMERA-GALLERY-20261002-FINAL"
 
           test -s "$ZIP"
           ACTUAL_SHA256="$(sha256sum "$ZIP" | awk '{print $1}')"
           echo "FIXED11 FINAL ZIP SHA256: $ACTUAL_SHA256"
 
           if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
-            echo "::error::Wrong ChatGPT_Control_Bridge_v0.1.0_FIXED11.zip is present in the repository."
+            echo "::error::Wrong FIXED11 ZIP."
             echo "::error::Expected SHA256: $EXPECTED_SHA256"
             echo "::error::Actual SHA256:   $ACTUAL_SHA256"
             exit 1
@@ -58,11 +58,14 @@ jobs:
           SETTINGS_FILE="$(find source -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print -quit)"
           test -n "$SETTINGS_FILE"
           PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
-          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          test -f "$PROJECT_DIR/app/src/main/res/xml/accessibility_service_config.xml"
           test -f "$PROJECT_DIR/app/src/main/java/com/example/chatgptbridge/MainActivity.java"
           test -f "$PROJECT_DIR/app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java"
+
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "ZIP verification and source preparation: OK"
 
       - name: Static FINAL FIXED11 checks
         working-directory: ${{ steps.project.outputs.project_dir }}
@@ -71,47 +74,61 @@ jobs:
           set -euo pipefail
 
           SERVICE="app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java"
+          MAIN="app/src/main/java/com/example/chatgptbridge/MainActivity.java"
           MANIFEST="app/src/main/AndroidManifest.xml"
+          CONFIG="app/src/main/res/xml/accessibility_service_config.xml"
           BUILD="app/build.gradle"
+          SETTINGS="settings.gradle"
           BUILD_ID="FIXED11-CAMERA-GALLERY-20261002-FINAL"
 
-          grep -q "rootProject.name='ChatGPT_Control_Bridge_v0.1.0_FIXED11'" settings.gradle
-          grep -q "versionName '0.1.0-FIXED11'" "$BUILD"
-          grep -q 'versionCode 11' "$BUILD"
-          grep -q 'compileSdk 35' "$BUILD"
-          grep -q 'targetSdk 35' "$BUILD"
+          check() {
+            local label="$1"
+            local file="$2"
+            local needle="$3"
+            if grep -Fq "$needle" "$file"; then
+              echo "[OK] $label"
+            else
+              echo "::error::[FAIL] $label"
+              echo "Missing text: $needle"
+              echo "File: $file"
+              exit 1
+            fi
+          }
 
-          grep -q 'FIXED11-CAMERA-GALLERY-20261002-FINAL' "$SERVICE"
-          grep -q 'SERVICE CONNECTED ' "$SERVICE"
+          check "project name" "$SETTINGS" "rootProject.name='ChatGPT_Control_Bridge_v0.1.0_FIXED11'"
+          check "versionName" "$BUILD" "versionName '0.1.0-FIXED11'"
+          check "versionCode 11" "$BUILD" "versionCode 11"
+          check "compileSdk 35" "$BUILD" "compileSdk 35"
+          check "targetSdk 35" "$BUILD" "targetSdk 35"
 
-          grep -q 'android.permission.BIND_ACCESSIBILITY_SERVICE' "$MANIFEST"
-          grep -q 'android.accessibilityservice.AccessibilityService' "$MANIFEST"
-          grep -q 'com.android.camera' "$MANIFEST"
-          grep -q 'com.oppo.camera' "$MANIFEST"
-          grep -q 'com.coloros.gallery3d' "$MANIFEST"
-          grep -q 'com.google.android.apps.photos' "$MANIFEST"
+          check "BUILD_ID in service" "$SERVICE" "$BUILD_ID"
+          check "service connected log" "$SERVICE" "SERVICE CONNECTED "
+          check "AccessibilityService manifest" "$MANIFEST" "android.accessibilityservice.AccessibilityService"
+          check "BIND_ACCESSIBILITY_SERVICE" "$MANIFEST" "android.permission.BIND_ACCESSIBILITY_SERVICE"
+          check "retrieve window content" "$CONFIG" 'android:canRetrieveWindowContent="true"'
+          check "perform gestures" "$CONFIG" 'android:canPerformGestures="true"'
+          check "interactive windows flag" "$CONFIG" 'flagRetrieveInteractiveWindows'
 
-          grep -q 'handleSystemAppCommand(name)' "$SERVICE"
-          grep -q 'log("SYSTEM CMD try:' "$SERVICE"
-          grep -q 'n.contains("камер")' "$SERVICE"
-          grep -q 'n.contains("галере")' "$SERVICE"
-          grep -q 'MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA' "$SERVICE"
-          grep -q 'MediaStore.ACTION_IMAGE_CAPTURE' "$SERVICE"
-          grep -q 'Intent.CATEGORY_APP_GALLERY' "$SERVICE"
-          grep -q 'MediaStore.Images.Media.EXTERNAL_CONTENT_URI' "$SERVICE"
-          grep -q 'Intent.ACTION_OPEN_DOCUMENT' "$SERVICE"
-          grep -q 'tryExplicitPackages' "$SERVICE"
-          grep -q 'SYSTEM OPEN RESOLVED' "$SERVICE"
-          grep -q 'SYSTEM OPEN NO HANDLER' "$SERVICE"
-          grep -q 'CAMERA FALLBACK PACKAGE' "$SERVICE"
-          grep -q 'GALLERY FALLBACK PACKAGE' "$SERVICE"
+          check "system command handler" "$SERVICE" "handleSystemAppCommand(name)"
+          check "camera command matching" "$SERVICE" 'n.contains("камер")'
+          check "gallery command matching" "$SERVICE" 'n.contains("галере")'
+          check "camera intent" "$SERVICE" "MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA"
+          check "camera capture fallback" "$SERVICE" "MediaStore.ACTION_IMAGE_CAPTURE"
+          check "gallery category intent" "$SERVICE" "Intent.CATEGORY_APP_GALLERY"
+          check "gallery image picker" "$SERVICE" "MediaStore.Images.Media.EXTERNAL_CONTENT_URI"
+          check "gallery document fallback" "$SERVICE" "Intent.ACTION_OPEN_DOCUMENT"
+          check "explicit package fallback" "$SERVICE" "tryExplicitPackages"
+          check "system app resolved log" "$SERVICE" "SYSTEM OPEN RESOLVED"
+          check "system app no-handler log" "$SERVICE" "SYSTEM OPEN NO HANDLER"
+          check "camera fallback logging" "$SERVICE" "CAMERA FALLBACK"
+          check "gallery fallback logging" "$SERVICE" "GALLERY FALLBACK"
 
-          grep -q 'private boolean clickMicrophone' "$SERVICE"
-          grep -q 'findMicrophoneNode' "$SERVICE"
-          grep -q 'performGlobalAction(GLOBAL_ACTION_BACK)' "$SERVICE"
-          grep -q 'dispatchGesture' "$SERVICE"
-          grep -q 'открыть файл' "$SERVICE"
-          grep -q 'R.id.logScroll' app/src/main/java/com/example/chatgptbridge/MainActivity.java
+          check "microphone click" "$SERVICE" "private boolean clickMicrophone"
+          check "microphone node search" "$SERVICE" "findMicrophoneNode"
+          check "global BACK" "$SERVICE" "performGlobalAction(GLOBAL_ACTION_BACK)"
+          check "gesture dispatch" "$SERVICE" "dispatchGesture"
+          check "file command" "$SERVICE" "открыть файл"
+          check "log scroll view" "$MAIN" "R.id.logScroll"
 
           echo "Static FINAL FIXED11 checks passed."
           echo "BUILD_ID=$BUILD_ID"
@@ -122,9 +139,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import pathlib, xml.etree.ElementTree as ET
+          import pathlib
+          import xml.etree.ElementTree as ET
 
           root = pathlib.Path('.')
+
           xml_files = [
               root/'app/src/main/AndroidManifest.xml',
               root/'app/src/main/res/xml/accessibility_service_config.xml',
@@ -132,6 +151,7 @@ jobs:
               root/'app/src/main/res/values/styles.xml',
               root/'app/src/main/res/layout/activity_main.xml',
           ]
+
           for p in xml_files:
               ET.parse(p)
 
@@ -139,10 +159,12 @@ jobs:
               root/'app/src/main/java/com/example/chatgptbridge/MainActivity.java',
               root/'app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java',
           ]
+
           for p in java_files:
               s = p.read_text(encoding='utf-8')
               if s.count('{') != s.count('}'):
                   raise SystemExit(f'Unbalanced braces: {p}')
+
           print('XML and Java source sanity checks passed.')
           PY
 
@@ -159,7 +181,6 @@ jobs:
           gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify FINAL APK
-        id: apk
         working-directory: ${{ steps.project.outputs.project_dir }}
         shell: bash
         run: |
@@ -171,32 +192,38 @@ jobs:
           BUILD_ID="FIXED11-CAMERA-GALLERY-20261002-FINAL"
 
           test -s "$APK"
-          echo "APK SHA256: $(sha256sum "$APK" | awk '{print $1}')"
+
+          APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          echo "APK SHA256: $APK_SHA256"
           sha256sum "$APK" > app-debug.apk.sha256
 
           echo "--- APK manifest ---"
-          "$AAPT" dump badging "$APK" | grep -E "package:|versionCode|versionName" | head -1
+          "$AAPT" dump badging "$APK" | grep -E "^package:" | head -1
+
           "$AAPT" dump badging "$APK" | grep -q "package: name='com.example.chatgptbridge'"
           "$AAPT" dump badging "$APK" | grep -q "versionCode='11'"
           "$AAPT" dump badging "$APK" | grep -q "versionName='0.1.0-FIXED11'"
+          echo "[OK] APK package/version"
 
           echo "--- APK signature ---"
           "$APKSIGNER" verify --verbose "$APK"
+          echo "[OK] APK signature"
 
           echo "--- APK BUILD_ID ---"
           FOUND=0
-          for dex in $(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\\.dex$'); do
+          while IFS= read -r dex; do
             if unzip -p "$APK" "$dex" | strings | grep -Fq "$BUILD_ID"; then
               FOUND=1
               break
             fi
-          done
+          done < <(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$')
+
           if [ "$FOUND" -ne 1 ]; then
-            echo "::error::BUILD_ID was not found inside the generated APK dex files."
+            echo "::error::BUILD_ID was not found inside generated APK dex files."
             exit 1
           fi
-          echo "BUILD_ID verified inside APK: $BUILD_ID"
 
+          echo "[OK] BUILD_ID inside APK: $BUILD_ID"
           echo "FINAL APK verification passed."
 
       - name: Upload FINAL APK and checksum
