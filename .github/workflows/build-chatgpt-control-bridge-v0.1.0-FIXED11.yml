@@ -69,8 +69,17 @@ jobs:
           grep -q 'findFocus' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'clearCache' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'runWithTargetRoot' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
-          ! grep -q 'BACK GLOBAL target=' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
-          grep -q 'global back skipped' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'performGlobalAction(GLOBAL_ACTION_BACK)' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'BACK FROM BRIDGE' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          grep -q 'BACK: target not foreground; no launch' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
+          python3 - <<'PY2'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java').read_text(encoding='utf-8')
+          m=re.search(r'private boolean backSmart\(\)\{(.*?)\n    \}\n\n    private boolean performBackOnTarget', s, re.S)
+          assert m, 'backSmart block not found'
+          assert 'launchTargetForOperation' not in m.group(1), 'backSmart must never launch target'
+          PY2
           grep -q 'dispatchGesture' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'ввод текста' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
           grep -q 'открыть файл' app/src/main/java/com/example/chatgptbridge/BridgeAccessibilityService.java
