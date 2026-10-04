@@ -52,7 +52,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
         }
     }
 
-    private JSONObject buildRequest(String sessionId, String userText) {
+    private JSONObject buildRequest(String sessionId, String userText) throws Exception {
         JSONObject request = new JSONObject();
         request.put("session_id", sessionId == null ? "default" : sessionId);
         request.put("content", userText == null ? "" : userText);
