@@ -1,4 +1,4 @@
-plugins { id 'com.android.application' }
+plugins { id 'com.android.application' }\n\ndependencies {\n    testImplementation 'junit:junit:4.13.2'\n}
 
 def ciRunNumber = System.getenv('GITHUB_RUN_NUMBER')
 def defaultVersionCode = 100
@@ -40,7 +40,7 @@ android {
         }
     }
 
-    compileOptions {
+    testOptions {\n        unitTests.returnDefaultValues = true\n    }\n\n    compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
