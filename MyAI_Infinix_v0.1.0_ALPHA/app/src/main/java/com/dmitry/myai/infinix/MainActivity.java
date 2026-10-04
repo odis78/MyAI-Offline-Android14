@@ -2,10 +2,6 @@ package com.dmitry.myai.infinix;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.ActivityNotFoundException;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
@@ -16,9 +12,14 @@ import android.widget.TextView;
 
 import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 
+import java.util.List;
 import java.util.Locale;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 
 public class MainActivity extends Activity {
+    private static final String CHATGPT_PACKAGE = "com.openai.chatgpt";
+
     private TextView statusText;
     private TextView chatText;
     private TextView logText;
@@ -40,6 +41,7 @@ public class MainActivity extends Activity {
 
         findViewById(R.id.openAccessibilityButton).setOnClickListener(
                 v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        findViewById(R.id.chatgptButton).setOnClickListener(v -> openChatGPT());
         findViewById(R.id.homeButton).setOnClickListener(v -> testHome());
         findViewById(R.id.backButton).setOnClickListener(v -> testBack());
         findViewById(R.id.scrollButton).setOnClickListener(v -> testScroll());
@@ -47,6 +49,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.sendCommandButton).setOnClickListener(v -> submitCommand());
 
         appendChat("MyAI: Готов. Напиши команду.");
+        appendChat("MyAI: ChatGPT подключается через установленное приложение; Control Bridge остаётся отдельным слоем управления.");
         refresh();
     }
 
@@ -60,35 +63,44 @@ public class MainActivity extends Activity {
         appendChat("Вы: " + raw);
         commandInput.setText("");
 
-        String command = raw.toLowerCase(Locale.ROOT).replace('ё', 'е').trim();
+        String command = CommandParser.normalize(raw);
 
-        if (containsAny(command, "домой", "на главный экран", "рабочий стол")) {
+        if (CommandParser.containsAny(command, "домой", "на главный экран", "рабочий стол")) {
             append("COMMAND RECOGNIZED: HOME");
             executeBridgeCommand("HOME", MyAiAccessibilityService::home,
                     "Готово: открыл рабочий стол.");
             return;
         }
-        if (containsAny(command, "назад", "вернись назад", "вернуться назад")) {
+        if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад")) {
             append("COMMAND RECOGNIZED: BACK");
             executeBridgeCommand("BACK", MyAiAccessibilityService::back,
                     "Готово: выполнил команду «Назад».");
             return;
         }
-        if (containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
+        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
             append("COMMAND RECOGNIZED: SCROLL_DOWN");
             executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
                     "Готово: прокрутил экран вниз.");
             return;
         }
 
-        String app = extractApp(command);
+        if (CommandParser.containsAny(command, "открой чатgpt", "запусти чатgpt",
+                "открыть чатgpt", "запустить чатgpt",
+                "открой chatgpt", "запусти chatgpt",
+                "открыть chatgpt", "запустить chatgpt")) {
+            append("COMMAND RECOGNIZED: OPEN_CHATGPT");
+            openChatGPT();
+            return;
+        }
+
+        String app = CommandParser.extractApp(command);
         if (app != null) {
             append("COMMAND RECOGNIZED: OPEN_APP " + app);
             openKnownApp(app);
             return;
         }
 
-        if (containsAny(command, "настройки", "открой настройки")) {
+        if (CommandParser.containsAny(command, "настройки", "открой настройки")) {
             append("COMMAND RECOGNIZED: OPEN_SETTINGS");
             openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
                     "Готово: открыл настройки Android.");
@@ -96,23 +108,35 @@ public class MainActivity extends Activity {
         }
 
         appendChat("MyAI: Я пока не знаю эту команду.");
-        appendChat("MyAI: Попробуй «Домой», «Назад», «Прокрути вниз», «Открой YouTube» или «Открой настройки».");
+        appendChat("MyAI: Попробуй «Домой», «Назад», «Прокрути вниз», «Открой YouTube», «Открой ChatGPT» или «Открой настройки».");
         append("COMMAND UNKNOWN");
     }
 
-    private String extractApp(String command) {
-        String[] prefixes = {"открой ", "запусти ", "открыть ", "запустить "};
-        for (String prefix : prefixes) {
-            if (command.startsWith(prefix)) {
-                String value = command.substring(prefix.length()).trim();
-                if (!value.isEmpty()) return value;
-            }
+    private void openChatGPT() {
+        PackageManager pm = getPackageManager();
+        Intent intent = pm.getLaunchIntentForPackage(CHATGPT_PACKAGE);
+
+        if (intent == null) {
+            intent = findLaunchIntentByName("chatgpt");
         }
-        return null;
+
+        if (intent == null) {
+            appendChat("MyAI: приложение ChatGPT не найдено.");
+            appendChat("MyAI: Установи официальное приложение ChatGPT от OpenAI, затем повтори команду.");
+            append("OPEN_CHATGPT: FAILED (APP NOT FOUND)");
+            return;
+        }
+
+        openExternalIntent(intent, "OPEN_CHATGPT", "Готово: открыл ChatGPT.");
     }
 
     private void openKnownApp(String app) {
         String normalized = normalizeAppName(app);
+
+        if (matchesApp(normalized, "chatgpt", "чатgпт", "чатgpt", "чатгпт", "чатджпт")) {
+            openChatGPT();
+            return;
+        }
 
         // Explicit aliases for the most common/system apps.
         if (matchesApp(normalized, "youtube", "ютуб", "ютюб", "youtub")) {
@@ -120,9 +144,6 @@ public class MainActivity extends Activity {
             if (intent != null) {
                 openExternalIntent(intent, "OPEN_YOUTUBE", "Готово: открыл YouTube.");
             } else {
-                // Some Android builds use a different YouTube package. Fall back
-                // to launcher-name resolution instead of reporting a false
-                // "not installed" result.
                 Intent fallback = findLaunchIntentByName("youtube");
                 if (fallback == null) {
                     fallback = findLaunchIntentByName(normalized);
@@ -155,8 +176,6 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // Generic launcher-app resolver: this makes installed apps work by their
-        // visible name instead of maintaining a hardcoded package list.
         Intent launch = findLaunchIntentByName(normalized);
         if (launch != null) {
             String label = launch.getStringExtra("myai.label");
@@ -175,10 +194,12 @@ public class MainActivity extends Activity {
         Intent launcher = new Intent(Intent.ACTION_MAIN);
         launcher.addCategory(Intent.CATEGORY_LAUNCHER);
         PackageManager pm = getPackageManager();
-        java.util.List<ResolveInfo> apps = pm.queryIntentActivities(launcher, 0);
+        List<ResolveInfo> apps = pm.queryIntentActivities(launcher, 0);
 
         ResolveInfo best = null;
         int bestScore = Integer.MAX_VALUE;
+        boolean ambiguousBest = false;
+
         for (ResolveInfo info : apps) {
             if (info.activityInfo == null) continue;
             CharSequence labelCs = info.loadLabel(pm);
@@ -189,19 +210,29 @@ public class MainActivity extends Activity {
             if (label.equals(requested)) {
                 best = info;
                 bestScore = 0;
+                ambiguousBest = false;
                 break;
             }
 
             int distance = levenshtein(requested, label);
             int maxLen = Math.max(requested.length(), label.length());
             int allowed = maxLen <= 5 ? 1 : (maxLen <= 9 ? 2 : 3);
-            if (distance <= allowed && distance < bestScore) {
-                best = info;
-                bestScore = distance;
+            if (distance <= allowed) {
+                if (distance < bestScore) {
+                    best = info;
+                    bestScore = distance;
+                    ambiguousBest = false;
+                } else if (distance == bestScore) {
+                    ambiguousBest = true;
+                }
             }
         }
 
-        if (best == null) return null;
+        if (best == null || ambiguousBest) {
+            if (ambiguousBest) append("OPEN_APP: ambiguous fuzzy match for " + requested);
+            return null;
+        }
+
         Intent result = new Intent(launcher);
         result.setClassName(best.activityInfo.packageName, best.activityInfo.name);
         CharSequence label = best.loadLabel(pm);
@@ -319,11 +350,6 @@ public class MainActivity extends Activity {
             append(status);
             lastStatus = status;
         }
-    }
-
-    private boolean containsAny(String text, String... values) {
-        for (String value : values) if (text.contains(value)) return true;
-        return false;
     }
 
     private void appendChat(String message) {
