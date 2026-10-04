@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - infinix
+      - infinix-chatgpt
 
 permissions:
   contents: read
