@@ -1,21 +1,27 @@
 package com.dmitry.myai.infinix.agent;
 
-import org.json.JSONObject;
-
 public final class AgentResultCodec {
     private AgentResultCodec() {}
 
     public static String toJson(AgentContracts.AgentResult result) {
-        try {
-            JSONObject o = new JSONObject();
-            o.put("type", "tool_result");
-            o.put("request_id", result.requestId());
-            o.put("tool", result.action().name().toLowerCase());
-            o.put("success", result.success());
-            o.put("message", result.message());
-            return o.toString();
-        } catch (Exception e) {
-            return "{\"type\":\"tool_result\",\"success\":false,\"message\":\"encoding_error\"}";
+        if (result == null) {
+            return "{\"type\":\"tool_result\",\"success\":false,\"message\":\"null_result\"}";
         }
+        return "{"
+                + "\"type\":\"tool_result\","
+                + "\"request_id\":\"" + escape(result.requestId()) + "\","
+                + "\"tool\":\"" + escape(result.action().name().toLowerCase()) + "\","
+                + "\"success\":" + result.success() + ","
+                + "\"message\":\"" + escape(result.message()) + "\""
+                + "}";
+    }
+
+    private static String escape(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }
