@@ -22,6 +22,7 @@ r = Path(".").resolve()
 
 expected = [
     r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java",
+    r / "app/src/main/java/com/dmitry/myai/infinix/CommandParser.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/memory/LocalMemoryStore.java",
@@ -51,6 +52,8 @@ if not ('android:name=".bridge.MyAiAccessibilityService"' in manifest or "com.dm
     raise SystemExit("Manifest missing AccessibilityService")
 if 'android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"' not in manifest:
     raise SystemExit("AccessibilityService missing BIND_ACCESSIBILITY_SERVICE protection")
+if 'android:name="com.openai.chatgpt"' not in manifest:
+    raise SystemExit("Manifest missing ChatGPT package visibility")
 
 java_files = list((r / "app/src/main/java").rglob("*.java"))
 for p in java_files:
@@ -65,18 +68,37 @@ for p in java_files:
         raise SystemExit(f"Package/path mismatch: {p.relative_to(r)} -> {m.group(1)}")
 
 main = (r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java").read_text(encoding="utf-8")
+parser = (r / "app/src/main/java/com/dmitry/myai/infinix/CommandParser.java").read_text(encoding="utf-8")
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
 
-for marker in ["ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh", "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand", "OPEN_YOUTUBE"]:
+for marker in [
+    "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
+    "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand",
+    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName"
+]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
 
-for marker in ["GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction", "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "dispatchGesture", "GestureResultCallback", "getRealMetrics"]:
+for marker in [
+    "normalize", "stripPolitePrefix", "пожалуйста ", "можешь ", "extractApp"
+]:
+    if marker not in parser:
+        raise SystemExit(f"CommandParser marker missing: {marker}")
+
+for marker in [
+    "GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction",
+    "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "dispatchGesture",
+    "GestureResultCallback", "getRealMetrics"
+]:
     if marker not in bridge:
         raise SystemExit(f"Accessibility marker missing: {marker}")
 
-for view_id in ["statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "logText", "openAccessibilityButton", "homeButton", "backButton", "scrollButton", "refreshButton", "logScroll"]:
+for view_id in [
+    "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton",
+    "chatgptButton", "logText", "openAccessibilityButton", "homeButton",
+    "backButton", "scrollButton", "refreshButton", "logScroll"
+]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
 
