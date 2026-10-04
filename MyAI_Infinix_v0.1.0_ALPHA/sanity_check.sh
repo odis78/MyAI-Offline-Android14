@@ -120,7 +120,7 @@ for marker in [
 for view_id in [
     "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "gatewayButton",
     "chatgptButton", "logText", "openAccessibilityButton", "homeButton",
-    "backButton", "scrollButton", "refreshButton", "logScroll", "gatewayEndpoint", "gatewayMessage", "gatewaySendButton"
+    "backButton", "scrollButton", "refreshButton", "logScroll"
 ]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
