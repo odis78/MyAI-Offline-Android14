@@ -26,6 +26,19 @@ public class AgentCommandParserTest {
         assertEquals("YouTube", c.payload());
     }
 
+    @Test public void modelParsesNestedArgumentsAndEscapes() {
+        String json = "{\"type\":\"tool_call\",\"request_id\":\"r-7\",\"tool\":\"open_app\",\"arguments\":{\"name\":\"You\\\"Tube\"}}";
+        AgentContracts.AgentCommand command = AgentCommandParser.fromModelJson(json);
+        assertEquals("r-7", command.requestId());
+        assertEquals(AgentContracts.Action.OPEN_APP, command.action());
+        assertEquals("You\"Tube", command.payload());
+    }
+
+    @Test public void modelRejectsInvalidNestedJson() {
+        assertEquals(AgentContracts.Action.NONE,
+                AgentCommandParser.fromModelJson("{\"type\":\"tool_call\",\"tool\":\"open_app\",\"arguments\":"));
+    }
+
     @Test public void modelRejectsUnknownTool() {
         String json = "{\"type\":\"tool_call\",\"tool\":\"delete_everything\"}";
         assertEquals(AgentContracts.Action.NONE, AgentCommandParser.fromModelJson(json).action());
