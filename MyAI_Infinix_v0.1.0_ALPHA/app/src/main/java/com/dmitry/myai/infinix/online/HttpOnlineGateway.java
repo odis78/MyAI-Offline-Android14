@@ -28,7 +28,11 @@ public final class HttpOnlineGateway implements OnlineGateway {
 
     @Override
     public void send(String sessionId, String userText, Callback callback) {
-        postJson(buildRequest(sessionId, userText), callback, true);
+        try {
+            postJson(buildRequest(sessionId, userText), callback, true);
+        } catch (Exception e) {
+            callback.onFailure("request build failed: " + safeMessage(e.getMessage()));
+        }
     }
 
     public void sendToolResult(String sessionId, String resultJson, Callback callback) {
