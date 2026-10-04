@@ -3,6 +3,8 @@ package com.dmitry.myai.infinix;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
@@ -17,6 +19,8 @@ import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 import com.dmitry.myai.infinix.online.HttpOnlineGateway;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Locale;
 
 public final class GatewayActivity extends Activity {
     private static final String PREFS = "myai_settings";
@@ -141,14 +145,13 @@ public final class GatewayActivity extends Activity {
                     message = ok ? "Готово: открыл настройки." : "Настройки недоступны.";
                 }
                 case OPEN_APP -> {
-                    Intent intent = getPackageManager()
-                            .getLaunchIntentForPackage(command.payload());
+                    Intent intent = findLaunchIntentByName(command.payload());
                     if (intent != null) {
                         startActivity(intent);
                         ok = true;
                     }
                     message = ok ? "Готово: приложение запущено." :
-                            "Пакет приложения не найден: " + command.payload();
+                            "Приложение не найдено: " + command.payload();
                 }
                 default -> message = "Неизвестное действие.";
             }
@@ -160,6 +163,76 @@ public final class GatewayActivity extends Activity {
                 new AgentContracts.AgentResult(command.requestId(), command.action(), ok, message);
         appendChat("MyAI: " + message);
         append("RESULT: " + AgentResultCodec.toJson(result));
+    }
+
+    private Intent findLaunchIntentByName(String requested) {
+        String target = normalizeAppName(requested);
+        Intent launcher = new Intent(Intent.ACTION_MAIN);
+        launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+        PackageManager pm = getPackageManager();
+        List<ResolveInfo> apps = pm.queryIntentActivities(launcher, 0);
+
+        ResolveInfo best = null;
+        int bestScore = Integer.MAX_VALUE;
+        boolean ambiguous = false;
+
+        for (ResolveInfo info : apps) {
+            if (info.activityInfo == null) continue;
+            CharSequence labelCs = info.loadLabel(pm);
+            if (labelCs == null) continue;
+            String label = normalizeAppName(labelCs.toString());
+            if (label.isEmpty()) continue;
+
+            if (label.equals(target)) {
+                best = info;
+                bestScore = 0;
+                ambiguous = false;
+                break;
+            }
+
+            int distance = levenshtein(target, label);
+            int maxLen = Math.max(target.length(), label.length());
+            int allowed = maxLen <= 5 ? 1 : (maxLen <= 9 ? 2 : 3);
+            if (distance <= allowed) {
+                if (distance < bestScore) {
+                    best = info;
+                    bestScore = distance;
+                    ambiguous = false;
+                } else if (distance == bestScore) {
+                    ambiguous = true;
+                }
+            }
+        }
+
+        if (best == null || ambiguous) return null;
+
+        Intent result = new Intent(launcher);
+        result.setClassName(best.activityInfo.packageName, best.activityInfo.name);
+        return result;
+    }
+
+    private String normalizeAppName(String value) {
+        return value.toLowerCase(Locale.ROOT)
+                .replace('ё', 'е')
+                .replaceAll("[^\\p{L}\\p{N}]+", "");
+    }
+
+    private int levenshtein(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1),
+                        prev[j - 1] + cost);
+            }
+            int[] tmp = prev;
+            prev = cur;
+            cur = tmp;
+        }
+        return prev[b.length()];
     }
 
     private void appendChat(String value) {
