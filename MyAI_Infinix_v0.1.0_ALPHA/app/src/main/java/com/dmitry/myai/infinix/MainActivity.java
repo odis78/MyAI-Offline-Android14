@@ -2,7 +2,6 @@ package com.dmitry.myai.infinix;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
@@ -17,6 +16,7 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private TextView statusText;
+    private TextView chatText;
     private TextView logText;
     private EditText commandInput;
     private final Handler handler = new Handler();
@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         statusText = findViewById(R.id.statusText);
+        chatText = findViewById(R.id.chatText);
         logText = findViewById(R.id.logText);
         commandInput = findViewById(R.id.commandInput);
 
@@ -41,31 +42,36 @@ public class MainActivity extends Activity {
         findViewById(R.id.refreshButton).setOnClickListener(v -> refresh());
         findViewById(R.id.sendCommandButton).setOnClickListener(v -> submitCommand());
 
+        appendChat("MyAI: Готов. Напиши команду.");
         refresh();
     }
 
     private void submitCommand() {
         String raw = commandInput.getText().toString().trim();
         if (raw.isEmpty()) {
-            append("КОМАНДА: пустая");
+            appendChat("MyAI: Введи команду.");
+            append("COMMAND EMPTY");
             return;
         }
-        append("Вы: " + raw);
+        appendChat("Вы: " + raw);
         commandInput.setText("");
 
         String command = raw.toLowerCase(Locale.ROOT).replace('ё', 'е').trim();
 
         if (containsAny(command, "домой", "на главный экран", "рабочий стол")) {
+            append("COMMAND RECOGNIZED: HOME");
             executeBridgeCommand("HOME", MyAiAccessibilityService::home,
                     "Готово: открыл рабочий стол.");
             return;
         }
         if (containsAny(command, "назад", "вернись назад", "вернуться назад")) {
+            append("COMMAND RECOGNIZED: BACK");
             executeBridgeCommand("BACK", MyAiAccessibilityService::back,
                     "Готово: выполнил команду «Назад».");
             return;
         }
         if (containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
+            append("COMMAND RECOGNIZED: SCROLL_DOWN");
             executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
                     "Готово: прокрутил экран вниз.");
             return;
@@ -73,17 +79,20 @@ public class MainActivity extends Activity {
 
         String app = extractApp(command);
         if (app != null) {
+            append("COMMAND RECOGNIZED: OPEN_APP " + app);
             openKnownApp(app);
             return;
         }
 
         if (containsAny(command, "настройки", "открой настройки")) {
+            append("COMMAND RECOGNIZED: OPEN_SETTINGS");
             openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
                     "Готово: открыл настройки Android.");
             return;
         }
 
-        append("MyAI: Я пока не знаю эту команду. Попробуй: «Домой», «Назад», «Прокрути вниз», «Открой YouTube», «Открой настройки».");
+        appendChat("MyAI: Я пока не знаю эту команду.");
+        appendChat("MyAI: Попробуй «Домой», «Назад», «Прокрути вниз», «Открой YouTube» или «Открой настройки».");
         append("COMMAND UNKNOWN");
     }
 
@@ -104,8 +113,8 @@ public class MainActivity extends Activity {
             if (intent != null) {
                 openExternalIntent(intent, "OPEN_YOUTUBE", "Готово: открыл YouTube.");
             } else {
-                openExternalIntent(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")),
-                        "OPEN_YOUTUBE", "Открыл ссылку YouTube в доступном браузере.");
+                appendChat("MyAI: YouTube не установлен. Интернет для этой команды не использую.");
+                append("OPEN_YOUTUBE: FAILED (APP NOT INSTALLED)");
             }
             return;
         }
@@ -125,39 +134,39 @@ public class MainActivity extends Activity {
                     "Готово: открыл настройки Android.");
             return;
         }
-        append("MyAI: пока не умею открывать приложение «" + app + "».");
+        appendChat("MyAI: пока не умею открывать приложение «" + app + "».");
         append("OPEN_APP FAILED: unknown app");
     }
 
     private void openExternalIntent(Intent intent, String action, String successMessage) {
         try {
             if (intent.resolveActivity(getPackageManager()) == null) {
-                append("MyAI: не найдено приложение для команды «" + action + "».");
+                appendChat("MyAI: не найдено приложение для команды «" + action + "».");
                 append(action + ": FAILED");
                 return;
             }
             startActivity(intent);
-            append(successMessage);
+            appendChat(successMessage);
             append(action + ": SUCCESS");
         } catch (Exception e) {
-            append("MyAI: ошибка запуска " + action + ": " + e.getMessage());
-            append(action + ": FAILED");
+            appendChat("MyAI: ошибка запуска " + action + ".");
+            append(action + ": FAILED: " + e.getClass().getSimpleName());
         }
     }
 
     private void executeBridgeCommand(String name, TestAction action, String successMessage) {
         if (!MyAiAccessibilityService.isConnected()) {
-            append("MyAI: Control Bridge не подключен.");
+            appendChat("MyAI: Control Bridge не подключен.");
             append(name + ": FAILED (BRIDGE OFF)");
             return;
         }
         try {
             boolean ok = action.run();
-            append(ok ? successMessage : "MyAI: команда «" + name + "» не выполнена.");
+            appendChat(ok ? successMessage : "MyAI: команда «" + name + "» не выполнена.");
             append(name + ": " + (ok ? "SUCCESS" : "FAILED"));
         } catch (Exception e) {
-            append("MyAI: ошибка " + name + ": " + e.getMessage());
-            append(name + ": FAILED");
+            appendChat("MyAI: ошибка выполнения команды «" + name + "».");
+            append(name + ": FAILED: " + e.getClass().getSimpleName());
         }
     }
 
@@ -212,6 +221,12 @@ public class MainActivity extends Activity {
     private boolean containsAny(String text, String... values) {
         for (String value : values) if (text.contains(value)) return true;
         return false;
+    }
+
+    private void appendChat(String message) {
+        chatText.append(message + "\n");
+        chatText.post(() -> ((ScrollView) findViewById(R.id.chatScroll))
+                .fullScroll(View.FOCUS_DOWN));
     }
 
     private void append(String message) {
