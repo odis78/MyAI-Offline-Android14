@@ -61,14 +61,8 @@ if 'android:name="com.openai.chatgpt"' not in manifest:
 java_files = list((r / "app/src/main/java").rglob("*.java"))
 for p in java_files:
     text = p.read_text(encoding="utf-8")
-    # Ignore braces inside Java strings/chars and comments; otherwise literals such as "{"
-    # can create false positives in a static brace-balance check.
-    masked = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
-    masked = re.sub(r"'(?:\\.|[^'\\])*'", "''", masked)
-    masked = re.sub(r'//.*', '', masked)
-    masked = re.sub(r'/\\*.*?\\*/', '', masked, flags=re.S)
-    if masked.count("{") != masked.count("}"):
-        raise SystemExit(f"Unbalanced braces: {p.relative_to(r)}")
+    # Java syntax/brace correctness is verified by Gradle/javac below.
+    # Do not duplicate a Java parser here; comments and string literals may contain braces.
     m = re.search(r"package\s+([A-Za-z0-9_.]+)\s*;", text)
     if not m:
         raise SystemExit(f"Missing package declaration: {p.relative_to(r)}")
