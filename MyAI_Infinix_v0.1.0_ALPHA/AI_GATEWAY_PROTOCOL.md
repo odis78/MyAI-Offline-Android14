@@ -39,3 +39,6 @@ After execution, the Android agent serializes the result as:
 ```
 
 A future gateway can use OpenAI Responses API as its model backend and perform the normal tool-call loop. The API key must remain on the gateway/backend, never in the APK.
+
+
+<!-- CI protocol revision: 2026-10-04 -->
