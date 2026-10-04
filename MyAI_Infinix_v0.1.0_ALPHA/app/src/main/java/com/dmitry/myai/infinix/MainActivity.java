@@ -3,6 +3,7 @@ package com.dmitry.myai.infinix;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.ScrollView;
@@ -13,6 +14,11 @@ import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 public class MainActivity extends Activity {
     private TextView statusText;
     private TextView logText;
+    private final Handler handler = new Handler();
+
+    private interface TestAction {
+        boolean run();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,19 +43,45 @@ public class MainActivity extends Activity {
     }
 
     private void testBack() {
-        runTest(() -> MyAiAccessibilityService.back(), "BACK");
+        if (!MyAiAccessibilityService.isConnected()) {
+            append("ERROR: Control Bridge not connected");
+            return;
+        }
+
+        append("BACK test: opening Android Settings...");
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> runTest(
+                    () -> MyAiAccessibilityService.back(),
+                    "BACK on Settings"), 1200);
+        } catch (Exception e) {
+            append("ERROR opening Settings: " + e.getMessage());
+        }
     }
 
     private void testScroll() {
-        runTest(() -> MyAiAccessibilityService.scrollDown(), "SCROLL");
+        if (!MyAiAccessibilityService.isConnected()) {
+            append("ERROR: Control Bridge not connected");
+            return;
+        }
+
+        append("SCROLL test: opening Android Settings...");
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> runTest(
+                    () -> MyAiAccessibilityService.scrollDown(),
+                    "SCROLL on Settings"), 1200);
+        } catch (Exception e) {
+            append("ERROR opening Settings: " + e.getMessage());
+        }
     }
 
-    private void runTest(Runnable action, String name) {
+    private void runTest(TestAction action, String name) {
         try {
-            action.run();
-            append("TEST dispatched: " + name);
+            boolean ok = action.run();
+            append("TEST " + name + ": " + (ok ? "SUCCESS" : "FAILED"));
         } catch (Exception e) {
-            append("ERROR: " + e.getMessage());
+            append("ERROR " + name + ": " + e.getMessage());
         }
     }
 
@@ -71,5 +103,11 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refresh();
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 }
