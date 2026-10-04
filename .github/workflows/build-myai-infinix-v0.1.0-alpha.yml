@@ -136,7 +136,10 @@ jobs:
           echo "${BADGING}" | grep -Fq "versionCode='${EXPECTED_VERSION_CODE}'"
           echo "${BADGING}" | grep -Fq "versionName='0.1.${GITHUB_RUN_NUMBER}-INFINIX-ALPHA'"
           SIGNING="$( "$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner" verify --verbose --print-certs "${APK}" )"
-          echo "${SIGNING}" | grep -Fq "Signer #1 certificate SHA-256 digest: ${EXPECTED_CERT_SHA256}"
+          EXPECTED_CERT_NORMALIZED="$(printf '%s' "${EXPECTED_CERT_SHA256}" | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_CERT_NORMALIZED="$(printf '%s\\n' "${SIGNING}" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}' | tr '[:upper:]' '[:lower:]')"
+          test -n "${ACTUAL_CERT_NORMALIZED}"
+          test "${ACTUAL_CERT_NORMALIZED}" = "${EXPECTED_CERT_NORMALIZED}"
           if echo "${SIGNING}" | grep -Fq "CN=Android Debug"; then
             echo "Debug certificate detected; refusing to publish update APK."
             exit 1
