@@ -16,6 +16,10 @@
         android:supportsRtl="true">
 
         <activity
+            android:name=".GatewayActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
