@@ -392,13 +392,13 @@ public class MainActivity extends Activity {
 
     private void appendChat(String message) {
         chatText.append(message + "\n");
-        chatText.post(() -> ((ScrollView) findViewById(R.id.chatScroll))
+        chatText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
                 .fullScroll(View.FOCUS_DOWN));
     }
 
     private void append(String message) {
         logText.append(message + "\n");
-        logText.post(() -> ((ScrollView) findViewById(R.id.logScroll))
+        logText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
                 .fullScroll(View.FOCUS_DOWN));
     }
 
