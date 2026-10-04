@@ -1,0 +1,19 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.dmitry.myai.infinix'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.dmitry.myai.infinix'
+        minSdk 26
+        targetSdk 35
+        versionCode 100
+        versionName '0.1.0-INFINIX-ALPHA'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
