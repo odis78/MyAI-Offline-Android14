@@ -33,11 +33,14 @@ public final class GatewayActivity extends Activity {
     private TextView log;
     private HttpOnlineGateway gateway;
     private int toolChainDepth = 0;
+    private int requestGeneration = 0;
+    private boolean active = false;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_gateway);
+        active = true;
 
         endpoint = findViewById(R.id.gatewayEndpoint);
         message = findViewById(R.id.gatewayMessage);
@@ -77,6 +80,7 @@ public final class GatewayActivity extends Activity {
         }
 
         toolChainDepth = 0;
+        final int generation = ++requestGeneration;
         appendChat("Вы: " + text);
         append("REQUEST session=" + session);
         message.setText("");
@@ -85,10 +89,14 @@ public final class GatewayActivity extends Activity {
         gateway = new HttpOnlineGateway(url);
         gateway.send(session, text, new HttpOnlineGateway.Callback() {
             @Override public void onSuccess(String assistantText, String toolCallJson) {
-                runOnUiThread(() -> handleResponse(assistantText, toolCallJson));
+                runOnUiThread(() -> {
+                        if (!isCurrent(generation)) return;
+                        handleResponse(assistantText, toolCallJson, generation);
+                    });
             }
             @Override public void onFailure(String error) {
                 runOnUiThread(() -> {
+                    if (!isCurrent(generation)) return;
                     appendChat("MyAI: Gateway ошибка: " + error);
                     append("GATEWAY FAILED: " + error);
                 });
@@ -96,7 +104,7 @@ public final class GatewayActivity extends Activity {
         });
     }
 
-    private void handleResponse(String assistantText, String toolCallJson) {
+    private void handleResponse(String assistantText, String toolCallJson, int generation) {
         if (assistantText != null && !assistantText.isBlank()) appendChat("AI: " + assistantText);
         append("RESPONSE: HTTP 2xx");
 
@@ -114,10 +122,10 @@ public final class GatewayActivity extends Activity {
         }
 
         appendChat("MyAI: выполняю " + command.action().name());
-        execute(command);
+        execute(command, generation);
     }
 
-    private void execute(AgentContracts.AgentCommand command) {
+    private void execute(AgentContracts.AgentCommand command, int generation) {
         if (toolChainDepth >= 3) {
             appendChat("MyAI: цепочка команд остановлена после 3 шагов.");
             append("TOOL_CHAIN STOPPED: max depth=3");
@@ -172,10 +180,10 @@ public final class GatewayActivity extends Activity {
         String resultJson = AgentResultCodec.toJson(result);
         appendChat("MyAI: " + message);
         append("RESULT: " + resultJson);
-        sendToolResult(command, resultJson);
+        sendToolResult(command, resultJson, generation);
     }
 
-    private void sendToolResult(AgentContracts.AgentCommand command, String resultJson) {
+    private void sendToolResult(AgentContracts.AgentCommand command, String resultJson, int generation) {
         if (gateway == null) {
             append("TOOL_RESULT: not sent (Gateway inactive)");
             return;
@@ -185,6 +193,7 @@ public final class GatewayActivity extends Activity {
         gateway.sendToolResult(session, resultJson, new HttpOnlineGateway.Callback() {
             @Override public void onSuccess(String assistantText, String toolCallJson) {
                 runOnUiThread(() -> {
+                    if (!isCurrent(generation)) return;
                     append("TOOL_RESULT: HTTP 2xx requestId=" + command.requestId());
                     if (assistantText != null && !assistantText.isBlank()) {
                         appendChat("AI: " + assistantText);
@@ -194,7 +203,7 @@ public final class GatewayActivity extends Activity {
                         AgentContracts.AgentCommand followUp =
                                 AgentCommandParser.fromModelJson(toolCallJson);
                         if (followUp.action() != AgentContracts.Action.NONE) {
-                            execute(followUp);
+                            execute(followUp, generation);
                         } else {
                             append("FOLLOW_UP_TOOL_CALL REJECTED");
                         }
@@ -203,7 +212,10 @@ public final class GatewayActivity extends Activity {
             }
 
             @Override public void onFailure(String error) {
-                runOnUiThread(() -> append("TOOL_RESULT FAILED: " + error));
+                runOnUiThread(() -> {
+                    if (!isCurrent(generation)) return;
+                    append("TOOL_RESULT FAILED: " + error);
+                });
             }
         });
     }
@@ -290,7 +302,13 @@ public final class GatewayActivity extends Activity {
                 .fullScroll(View.FOCUS_DOWN));
     }
 
+    private boolean isCurrent(int generation) {
+        return active && generation == requestGeneration && !isFinishing() && !isDestroyed();
+    }
+
     @Override protected void onDestroy() {
+        active = false;
+        requestGeneration++;
         if (gateway != null) gateway.shutdown();
         super.onDestroy();
     }
