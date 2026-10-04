@@ -1,0 +1,100 @@
+name: Build MyAI Infinix v0.1.0 ALPHA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PROJECT_DIR: MyAI_Infinix_v0.1.0_ALPHA
+  APK: MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+  BUILD_TOOLS: 35.0.0
+jobs:
+  build:
+    name: Static checks + tests + lint + APK verification
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify exact source directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "${PROJECT_DIR}"
+          test ! -d "My AI_Infinix_v0.1.0_ALPHA"
+          test ! -d "MyAI_Infinix_v0.1.0_ALP HA"
+          test -f "${PROJECT_DIR}/settings.gradle"
+          test -f "${PROJECT_DIR}/build.gradle"
+          test -f "${PROJECT_DIR}/app/build.gradle"
+          test -f "${PROJECT_DIR}/sanity_check.sh"
+          test -f "${PROJECT_DIR}/app/src/main/AndroidManifest.xml"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$ANDROID_HOME/platform-tools/adb" version
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Verify Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --version | tee "${RUNNER_TEMP}/gradle-version.txt"
+          grep -Fq "Gradle 8.11.1" "${RUNNER_TEMP}/gradle-version.txt"
+      - name: Static source sanity
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x sanity_check.sh
+          ./sanity_check.sh
+      - name: Gradle test
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle test --stacktrace --no-daemon
+      - name: Android lint
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle lintDebug --stacktrace --no-daemon
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "${APK}"
+          BADGING="$("$ANDROID_HOME/build-tools/${BUILD_TOOLS}/aapt" dump badging "${APK}")"
+          echo "${BADGING}" | grep -Fq "package: name='com.dmitry.myai.infinix'"
+          echo "${BADGING}" | grep -Fq "versionCode='100'"
+          echo "${BADGING}" | grep -Fq "versionName='0.1.0-INFINIX-ALPHA'"
+          "$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner" verify --verbose "${APK}"
+          sha256sum "${APK}" | tee "${APK}.sha256"
+          SIZE_BYTES=$(stat -c '%s' "${APK}")
+          if [ "${SIZE_BYTES}" -gt 52428800 ]; then echo "::warning::APK is larger than 50 MiB"; fi
+      - name: Upload verification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyAI-Infinix-v0.1.0-ALPHA-debug
+          path: |
+            ${{ env.APK }}
+            ${{ env.APK }}.sha256
+            MyAI_Infinix_v0.1.0_ALPHA/app/build/reports/lint-results-debug.html
+          if-no-files-found: error
+          retention-days: 30
