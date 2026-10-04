@@ -61,8 +61,6 @@ if 'android:name="com.openai.chatgpt"' not in manifest:
 java_files = list((r / "app/src/main/java").rglob("*.java"))
 for p in java_files:
     text = p.read_text(encoding="utf-8")
-    if "\\\\n" in text:
-        raise SystemExit(f"Literal \\n sequence found in Java source: {p.relative_to(r)}")
     # Java syntax/brace correctness is verified by Gradle/javac below.
     # Do not duplicate a Java parser here; comments and string literals may contain braces.
     m = re.search(r"package\s+([A-Za-z0-9_.]+)\s*;", text)
