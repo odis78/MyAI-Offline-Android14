@@ -2,7 +2,7 @@
 
 The Android app is the **agent/executor**, not the place where an OpenAI API key is stored.
 
-## Request
+## 1. User request
 
 POST the configured gateway URL:
 
@@ -13,54 +13,47 @@ POST the configured gateway URL:
 }
 ```
 
-## Response
+## 2. Model response
 
-The gateway returns normal assistant text and, when an action is required, a strict tool call:
+The gateway returns normal assistant text and, when an action is required, a strict tool call. `tool_call` is a JSON **string** in this first protocol revision:
 
 ```json
 {
   "content": "Открываю YouTube.",
-  "tool_call": "{"type":"tool_call","request_id":"42","tool":"open_app","arguments":{"name":"YouTube"}}"
+  "tool_call": "{\"type\":\"tool_call\",\"request_id\":\"42\",\"tool\":\"open_app\",\"arguments\":{\"name\":\"YouTube\"}}"
 }
 ```
 
-The Android side validates the tool name against its allowlist. Unknown tools are rejected and are never executed.
+Android parses the tool call with a real JSON parser and validates the tool name against the allowlist. Unknown or malformed tools are rejected and are never executed.
 
-After execution, the Android agent serializes the result as:
+## 3. Tool result
+
+After execution Android POSTs the result back to the same configured Gateway URL:
 
 ```json
 {
+  "session_id": "phone-1",
   "type": "tool_result",
-  "request_id": "42",
-  "tool": "open_app",
-  "success": true,
-  "message": "Готово: открыл YouTube."
+  "tool_result": {
+    "type": "tool_result",
+    "request_id": "42",
+    "tool": "open_app",
+    "success": true,
+    "message": "Готово: открыл YouTube."
+  }
 }
 ```
 
-A future gateway can use OpenAI Responses API as its model backend and perform the normal tool-call loop. The API key must remain on the gateway/backend, never in the APK.
+The Gateway may answer this tool-result request with normal assistant text and an optional next `tool_call`. Android validates that next call again before executing it.
 
+## 4. Security rules
 
-<!-- CI protocol revision: 2026-10-04 -->
+- No OpenAI API key is stored in the APK.
+- Only the configured Gateway endpoint is contacted.
+- Android executes only the allowlisted actions.
+- Malformed JSON, unknown tools, and missing required arguments are rejected.
+- Request IDs are preserved across tool results.
+- Network timeouts remain bounded: 8 seconds connect, 15 seconds read.
+- Offline/local command execution remains available if the Gateway is unavailable.
 
-<!-- sanity checker fix revision -->
-
-<!-- gradle-format validation revision -->
-
-<!-- sanity path revision -->
-
-<!-- diagnostic path revision -->
-
-<!-- workflow rewrite validation -->
-
-<!-- final sanity newline guard -->
-
-<!-- codec compile fix -->
-
-<!-- MainActivity agent compile fix -->
-
-<!-- pure Java protocol parser revision -->
-
-<!-- Java syntax delegated to Gradle -->
-
-<!-- final Java escaping validation -->
+A future Gateway can use the OpenAI Responses API as its model backend. The API key must remain on the gateway/backend, never in the APK.
