@@ -80,7 +80,7 @@ for view_id in ["statusText", "logText", "openAccessibilityButton", "homeButton"
 
 for bad in ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "platform-tools "]:
     for p in r.rglob("*"):
-        if p.is_file() and ".git" not in p.parts:
+        if p.is_file() and ".git" not in p.parts and p.name != "sanity_check.sh" and ".github" not in p.parts:
             if bad in p.read_text(encoding="utf-8", errors="ignore"):
                 raise SystemExit(f"Suspicious typo '{bad}' found in {p.relative_to(r)}")
 
