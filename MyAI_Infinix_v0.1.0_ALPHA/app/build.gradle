@@ -1,5 +1,10 @@
 plugins { id 'com.android.application' }
 
+def ciRunNumber = System.getenv('GITHUB_RUN_NUMBER')
+def defaultVersionCode = 100
+def computedVersionCode = ciRunNumber?.isInteger() ? defaultVersionCode + ciRunNumber.toInteger() : defaultVersionCode
+def computedVersionName = ciRunNumber?.isInteger() ? "0.1.${ciRunNumber}-INFINIX-ALPHA" : "0.1.0-INFINIX-ALPHA"
+
 android {
     namespace 'com.dmitry.myai.infinix'
     compileSdk 35
@@ -8,8 +13,31 @@ android {
         applicationId 'com.dmitry.myai.infinix'
         minSdk 26
         targetSdk 35
-        versionCode 100
-        versionName '0.1.0-INFINIX-ALPHA'
+        versionCode computedVersionCode
+        versionName computedVersionName
+    }
+
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('MYAI_KEYSTORE_PATH')
+            if (keystorePath) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv('MYAI_KEYSTORE_PASSWORD')
+                keyAlias = System.getenv('MYAI_KEY_ALIAS')
+                keyPassword = System.getenv('MYAI_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            debuggable false
+            if (System.getenv('MYAI_KEYSTORE_PATH')) {
+                signingConfig signingConfigs.release
+            } else {
+                throw new GradleException('Permanent MyAI Infinix release signing is required. Configure the MyAI signing environment variables.')
+            }
+        }
     }
 
     compileOptions {
