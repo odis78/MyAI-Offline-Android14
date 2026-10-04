@@ -2,6 +2,10 @@ package com.dmitry.myai.infinix;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
@@ -108,34 +112,120 @@ public class MainActivity extends Activity {
     }
 
     private void openKnownApp(String app) {
-        if (app.contains("youtube") || app.contains("ютуб")) {
+        String normalized = normalizeAppName(app);
+
+        // Explicit aliases for the most common/system apps.
+        if (matchesApp(normalized, "youtube", "ютуб", "ютюб", "youtub")) {
             Intent intent = getPackageManager().getLaunchIntentForPackage("com.google.android.youtube");
             if (intent != null) {
                 openExternalIntent(intent, "OPEN_YOUTUBE", "Готово: открыл YouTube.");
             } else {
-                appendChat("MyAI: YouTube не установлен. Интернет для этой команды не использую.");
+                appendChat("MyAI: YouTube не установлен.");
                 append("OPEN_YOUTUBE: FAILED (APP NOT INSTALLED)");
             }
             return;
         }
-        if (app.contains("камер")) {
+        if (matchesApp(normalized, "камера", "camera")) {
             openExternalIntent(new Intent("android.media.action.IMAGE_CAPTURE"),
                     "OPEN_CAMERA", "Готово: открыл камеру.");
             return;
         }
-        if (app.contains("галере") || app.contains("фото")) {
+        if (matchesApp(normalized, "галерея", "gallery", "фото", "photos")) {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setType("image/*");
             openExternalIntent(intent, "OPEN_GALLERY", "Готово: открыл галерею.");
             return;
         }
-        if (app.contains("настрой")) {
+        if (matchesApp(normalized, "настройки", "settings")) {
             openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
                     "Готово: открыл настройки Android.");
             return;
         }
-        appendChat("MyAI: пока не умею открывать приложение «" + app + "».");
-        append("OPEN_APP FAILED: unknown app");
+
+        // Generic launcher-app resolver: this makes installed apps work by their
+        // visible name instead of maintaining a hardcoded package list.
+        Intent launch = findLaunchIntentByName(normalized);
+        if (launch != null) {
+            String label = launch.getStringExtra("myai.label");
+            if (label == null || label.isEmpty()) label = app;
+            openExternalIntent(launch, "OPEN_APP " + label,
+                    "Готово: открыл " + label + ".");
+            return;
+        }
+
+        appendChat("MyAI: не нашёл приложение «" + app + "».");
+        appendChat("MyAI: Попробуй точное название приложения.");
+        append("OPEN_APP FAILED: app not found");
+    }
+
+    private Intent findLaunchIntentByName(String requested) {
+        Intent launcher = new Intent(Intent.ACTION_MAIN);
+        launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+        PackageManager pm = getPackageManager();
+        java.util.List<ResolveInfo> apps = pm.queryIntentActivities(launcher, 0);
+
+        ResolveInfo best = null;
+        int bestScore = Integer.MAX_VALUE;
+        for (ResolveInfo info : apps) {
+            if (info.activityInfo == null) continue;
+            CharSequence labelCs = info.loadLabel(pm);
+            if (labelCs == null) continue;
+            String label = normalizeAppName(labelCs.toString());
+            if (label.isEmpty()) continue;
+
+            if (label.equals(requested)) {
+                best = info;
+                bestScore = 0;
+                break;
+            }
+
+            int distance = levenshtein(requested, label);
+            int maxLen = Math.max(requested.length(), label.length());
+            int allowed = maxLen <= 5 ? 1 : (maxLen <= 9 ? 2 : 3);
+            if (distance <= allowed && distance < bestScore) {
+                best = info;
+                bestScore = distance;
+            }
+        }
+
+        if (best == null) return null;
+        Intent result = new Intent(launcher);
+        result.setClassName(best.activityInfo.packageName, best.activityInfo.name);
+        CharSequence label = best.loadLabel(pm);
+        result.putExtra("myai.label", label == null ? requested : label.toString());
+        return result;
+    }
+
+    private String normalizeAppName(String value) {
+        return value.toLowerCase(Locale.ROOT)
+                .replace('ё', 'е')
+                .replaceAll("[^\\p{L}\\p{N}]+", "");
+    }
+
+    private boolean matchesApp(String value, String... aliases) {
+        for (String alias : aliases) {
+            String normalizedAlias = normalizeAppName(alias);
+            if (value.equals(normalizedAlias)) return true;
+            int maxLen = Math.max(value.length(), normalizedAlias.length());
+            int allowed = maxLen <= 5 ? 1 : (maxLen <= 9 ? 2 : 3);
+            if (levenshtein(value, normalizedAlias) <= allowed) return true;
+        }
+        return false;
+    }
+
+    private int levenshtein(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = cur; cur = tmp;
+        }
+        return prev[b.length()];
     }
 
     private void openExternalIntent(Intent intent, String action, String successMessage) {
