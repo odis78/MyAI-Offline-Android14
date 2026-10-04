@@ -1,5 +1,9 @@
 package com.dmitry.myai.infinix.agent;
 
+import org.json.JSONObject;
+
+import java.util.Locale;
+
 public final class AgentResultCodec {
     private AgentResultCodec() {}
 
@@ -7,21 +11,16 @@ public final class AgentResultCodec {
         if (result == null) {
             return "{\"type\":\"tool_result\",\"success\":false,\"message\":\"null_result\"}";
         }
-        return "{"
-                + "\"type\":\"tool_result\","
-                + "\"request_id\":\"" + escape(result.requestId()) + "\","
-                + "\"tool\":\"" + escape(result.action().name().toLowerCase()) + "\","
-                + "\"success\":" + result.success() + ","
-                + "\"message\":\"" + escape(result.message()) + "\""
-                + "}";
-    }
-
-    private static String escape(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        try {
+            JSONObject json = new JSONObject();
+            json.put("type", "tool_result");
+            json.put("request_id", result.requestId());
+            json.put("tool", result.action().name().toLowerCase(Locale.ROOT));
+            json.put("success", result.success());
+            json.put("message", result.message());
+            return json.toString();
+        } catch (Exception e) {
+            return "{\"type\":\"tool_result\",\"success\":false,\"message\":\"codec_error\"}";
+        }
     }
 }
