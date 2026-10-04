@@ -45,10 +45,12 @@ for p in [
     ET.parse(p)
 
 manifest = (r / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
-if not ("android:name=\".MainActivity\"" in manifest or "com.dmitry.myai.infinix.MainActivity" in manifest):
+if not ("android:name=".MainActivity"" in manifest or "com.dmitry.myai.infinix.MainActivity" in manifest):
     raise SystemExit("Manifest missing MainActivity")
-if not ("android:name=\".bridge.MyAiAccessibilityService\"" in manifest or "com.dmitry.myai.infinix.bridge.MyAiAccessibilityService" in manifest):
+if not ("android:name=".bridge.MyAiAccessibilityService"" in manifest or "com.dmitry.myai.infinix.bridge.MyAiAccessibilityService" in manifest):
     raise SystemExit("Manifest missing AccessibilityService")
+if 'android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"' not in manifest:
+    raise SystemExit("AccessibilityService missing BIND_ACCESSIBILITY_SERVICE protection")
 
 java_files = list((r / "app/src/main/java").rglob("*.java"))
 for p in java_files:
@@ -66,15 +68,25 @@ main = (r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java").read_
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
 
-for marker in ["ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh"]:
+for marker in [
+    "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
+    "ACTION_SETTINGS", "postDelayed"
+]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
 
-for marker in ["GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "dispatchGesture", "getRootInActiveWindow"]:
+for marker in [
+    "GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction",
+    "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "dispatchGesture",
+    "GestureResultCallback", "getRealMetrics"
+]:
     if marker not in bridge:
         raise SystemExit(f"Accessibility marker missing: {marker}")
 
-for view_id in ["statusText", "logText", "openAccessibilityButton", "homeButton", "backButton", "scrollButton", "refreshButton"]:
+for view_id in [
+    "statusText", "logText", "openAccessibilityButton", "homeButton",
+    "backButton", "scrollButton", "refreshButton", "logScroll"
+]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
 
