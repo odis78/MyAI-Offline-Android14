@@ -134,7 +134,11 @@ public class MainActivity extends Activity {
         openExternalIntent(intent, "OPEN_CHATGPT", "Готово: открыл ChatGPT.");
     }
 
-    private void openKnownApp(String app) {\n        openKnownApp(app, "local");\n    }\n\n    private void openKnownApp(String app, String requestId) {
+    private void openKnownApp(String app) {
+        openKnownApp(app, "local");
+    }
+
+    private void openKnownApp(String app, String requestId) {
         String normalized = normalizeAppName(app);
 
         if (matchesApp(normalized, "chatgpt", "чатgпт", "чатgpt", "чатгпт", "чатджпт")) {
@@ -285,7 +289,7 @@ public class MainActivity extends Activity {
             }
             startActivity(intent);
             appendChat(successMessage);
-            append(action + ": SUCCESS requestId=" + requestId);
+            append(action + ": SUCCESS");
         } catch (Exception e) {
             appendChat("MyAI: ошибка запуска " + action + ".");
             append(action + ": FAILED: " + e.getClass().getSimpleName());
