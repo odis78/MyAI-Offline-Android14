@@ -23,10 +23,13 @@ r = Path(".").resolve()
 expected = [
     r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/CommandParser.java",
+    r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentCommandParser.java",
+    r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentResultCodec.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/memory/LocalMemoryStore.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/online/OnlineGateway.java",
+    r / "app/src/main/java/com/dmitry/myai/infinix/online/HttpOnlineGateway.java",
 ]
 missing = [str(p.relative_to(r)) for p in expected if not p.is_file()]
 if missing:
@@ -75,13 +78,13 @@ layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="u
 for marker in [
     "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
     "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand",
-    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName"
+    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec"
 ]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
 
 for marker in [
-    "normalize", "stripPolitePrefix", "пожалуйста ", "можешь ", "extractApp"
+    "normalize", "stripPolitePrefix", "пожалуйста ", "можешь ", "extractApp", "fromNaturalLanguage", "fromModelJson"
 ]:
     if marker not in parser:
         raise SystemExit(f"CommandParser marker missing: {marker}")
