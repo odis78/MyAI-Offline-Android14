@@ -2,9 +2,8 @@ package com.dmitry.myai.infinix.online;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -149,23 +148,19 @@ public final class HttpOnlineGateway implements OnlineGateway {
 
     private static String readAll(InputStream stream, int maxBytes) throws Exception {
         if (stream == null) return "";
-        StringBuilder out = new StringBuilder();
+        byte[] buffer = new byte[4096];
         int total = 0;
-        char[] buffer = new char[4096];
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            int count;
-            while ((count = reader.read(buffer)) != -1) {
-                total += count;
-                if (total > maxBytes) {
-                    throw new IllegalStateException("response too large");
-                }
-                out.append(buffer, 0, count);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int count;
+        while ((count = stream.read(buffer)) != -1) {
+            total += count;
+            if (total > maxBytes) {
+                throw new IllegalStateException("response too large");
             }
+            out.write(buffer, 0, count);
         }
-        return out.toString();
+        return out.toString(StandardCharsets.UTF_8.name());
     }
-
     private static String safeMessage(String value) {
         return value == null || value.isBlank() ? "network error" : value;
     }
