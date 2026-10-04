@@ -83,7 +83,7 @@ assert "include ':app'" in settings, "App module is not included"
 
 # Reject known corruption/typos from earlier revisions.
 bad_fragments = ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "platform-tools ", "platforms;android-35 ", "build-tools;35.0.0 "]
-scan_roots = [r / ".github", r / "app", r / "build.gradle", r / "settings.gradle", r / "gradle.properties", r / "sanity_check.sh"]
+scan_roots = [r / ".github", r / "app", r / "build.gradle", r / "settings.gradle", r / "gradle.properties"]
 for base in scan_roots:
     paths = [base] if base.is_file() else [p for p in base.rglob("*") if p.is_file()]
     for p in paths:
