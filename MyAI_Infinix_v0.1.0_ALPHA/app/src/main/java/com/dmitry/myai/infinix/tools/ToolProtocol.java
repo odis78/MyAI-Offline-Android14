@@ -1,5 +1,6 @@
 package com.dmitry.myai.infinix.tools;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Collections;
@@ -42,20 +43,29 @@ public final class ToolProtocol {
         public Map<String, String> arguments() { return arguments; }
 
         public JSONObject toJson() {
-            JSONObject json = new JSONObject();
-            json.put("type", TYPE_TOOL_CALL);
-            json.put("request_id", requestId);
-            json.put("tool", tool == null ? "" : tool.name().toLowerCase());
-            JSONObject args = new JSONObject();
-            for (Map.Entry<String, String> e : arguments.entrySet()) args.put(e.getKey(), e.getValue());
-            json.put("arguments", args);
-            return json;
+            try {
+                JSONObject json = new JSONObject();
+                json.put("type", TYPE_TOOL_CALL);
+                json.put("request_id", requestId);
+                json.put("tool", tool == null ? "" : tool.name().toLowerCase());
+                JSONObject args = new JSONObject();
+                for (Map.Entry<String, String> e : arguments.entrySet()) args.put(e.getKey(), e.getValue());
+                json.put("arguments", args);
+                return json;
+            } catch (JSONException e) {
+                throw new IllegalStateException("failed to encode tool call", e);
+            }
         }
     }
 
     public static Call parseStrict(String raw) {
         if (raw == null || raw.isBlank()) throw new IllegalArgumentException("empty tool call");
-        JSONObject json = new JSONObject(raw.trim());
+        final JSONObject json;
+        try {
+            json = new JSONObject(raw.trim());
+        } catch (JSONException e) {
+            throw new IllegalArgumentException("invalid tool call JSON", e);
+        }
         if (!TYPE_TOOL_CALL.equalsIgnoreCase(json.optString("type", ""))) {
             throw new IllegalArgumentException("invalid tool call type");
         }
