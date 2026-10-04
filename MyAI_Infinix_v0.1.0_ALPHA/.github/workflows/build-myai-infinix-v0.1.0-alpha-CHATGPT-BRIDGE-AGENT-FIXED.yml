@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Strict source check
-        working-directory: \${{ env.PROJECT_DIR }}
+        working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
@@ -70,10 +70,10 @@ jobs:
       - name: Prepare signing
         shell: bash
         env:
-          KS_B64: \${{ secrets.MYAI_INFINIX_KEYSTORE_B64 }}
-          KS_PASS: \${{ secrets.MYAI_INFINIX_KEYSTORE_PASSWORD }}
-          KS_ALIAS: \${{ secrets.MYAI_INFINIX_KEY_ALIAS }}
-          KEY_PASS: \${{ secrets.MYAI_INFINIX_KEY_PASSWORD }}
+          KS_B64: ${{ secrets.MYAI_INFINIX_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.MYAI_INFINIX_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.MYAI_INFINIX_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MYAI_INFINIX_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$KS_B64"
@@ -88,15 +88,15 @@ jobs:
           echo "MYAI_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
 
       - name: Tests
-        working-directory: \${{ env.PROJECT_DIR }}
+        working-directory: ${{ env.PROJECT_DIR }}
         run: gradle test --stacktrace --no-daemon
 
       - name: Lint
-        working-directory: \${{ env.PROJECT_DIR }}
+        working-directory: ${{ env.PROJECT_DIR }}
         run: gradle lintRelease --stacktrace --no-daemon
 
       - name: Build signed APK
-        working-directory: \${{ env.PROJECT_DIR }}
+        working-directory: ${{ env.PROJECT_DIR }}
         run: gradle :app:assembleRelease --stacktrace --no-daemon
 
       - name: Verify APK
@@ -116,10 +116,10 @@ jobs:
       - name: Upload final artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MyAI-Infinix-ChatGPT-ControlBridge-Agent-FIXED-\${{ github.run_number }}
+          name: MyAI-Infinix-ChatGPT-ControlBridge-Agent-FIXED-${{ github.run_number }}
           path: |
-            \${{ env.APK }}
-            \${{ env.APK }}.sha256
+            ${{ env.APK }}
+            ${{ env.APK }}.sha256
             MyAI_Infinix_v0.1.0_ALPHA/app/build/reports/lint-results-release.html
           if-no-files-found: error
           retention-days: 30
