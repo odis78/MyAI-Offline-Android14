@@ -129,6 +129,14 @@ for view_id in [
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
 
+for checked in [
+    r / "app/build.gradle",
+    r / ".github/workflows/build-myai-infinix-v0.1.0-alpha.yml"
+]:
+    raw = checked.read_text(encoding="utf-8")
+    if r"\\n" in raw:
+        raise SystemExit(f"Literal \\n sequence found where real line breaks are required: {checked.relative_to(r)}")
+
 for bad in ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "platform-tools "]:
     for p in r.rglob("*"):
         if p.is_file() and ".git" not in p.parts and p.name != "sanity_check.sh" and ".github" not in p.parts:
