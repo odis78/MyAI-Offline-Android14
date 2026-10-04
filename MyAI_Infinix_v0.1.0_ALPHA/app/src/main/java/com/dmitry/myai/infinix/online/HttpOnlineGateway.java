@@ -5,7 +5,6 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +12,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class HttpOnlineGateway implements OnlineGateway {
+    private static final int MAX_REQUEST_TEXT = 16 * 1024;
+    private static final int MAX_RESPONSE_BYTES = 256 * 1024;
+    private static final int CONNECT_TIMEOUT_MS = 8000;
+    private static final int READ_TIMEOUT_MS = 15000;
+
     private final String endpoint;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -22,12 +26,28 @@ public final class HttpOnlineGateway implements OnlineGateway {
 
     @Override
     public boolean isAvailable() {
-        return !endpoint.isEmpty()
-                && (endpoint.startsWith("https://") || endpoint.startsWith("http://"));
+        if (endpoint.isEmpty() || endpoint.length() > 2048) {
+            return false;
+        }
+        try {
+            URL url = new URL(endpoint);
+            String protocol = url.getProtocol();
+            return ("https".equalsIgnoreCase(protocol) || "http".equalsIgnoreCase(protocol))
+                    && url.getHost() != null
+                    && !url.getHost().isBlank()
+                    && url.getUserInfo() == null
+                    && url.getRef() == null;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Override
     public void send(String sessionId, String userText, Callback callback) {
+        if (userText != null && userText.length() > MAX_REQUEST_TEXT) {
+            callback.onFailure("message too long (max " + MAX_REQUEST_TEXT + " characters)");
+            return;
+        }
         try {
             postJson(buildRequest(sessionId, userText), callback);
         } catch (Exception e) {
@@ -38,6 +58,10 @@ public final class HttpOnlineGateway implements OnlineGateway {
     public void sendToolResult(String sessionId, String resultJson, Callback callback) {
         if (resultJson == null || resultJson.isBlank()) {
             callback.onFailure("empty tool result");
+            return;
+        }
+        if (resultJson.length() > MAX_REQUEST_TEXT) {
+            callback.onFailure("tool result too large");
             return;
         }
         try {
@@ -61,7 +85,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
 
     private void postJson(JSONObject request, Callback callback) {
         if (!isAvailable()) {
-            callback.onFailure("AI Gateway is not configured");
+            callback.onFailure("AI Gateway URL is invalid or not configured");
             return;
         }
 
@@ -70,14 +94,19 @@ public final class HttpOnlineGateway implements OnlineGateway {
             try {
                 connection = (HttpURLConnection) new URL(endpoint).openConnection();
                 connection.setRequestMethod("POST");
-                connection.setConnectTimeout(8000);
-                connection.setReadTimeout(15000);
+                connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(READ_TIMEOUT_MS);
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 connection.setRequestProperty("Accept", "application/json");
 
                 byte[] body = request.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream out = connection.getOutputStream()) {
+                if (body.length > MAX_REQUEST_TEXT * 4) {
+                    callback.onFailure("request payload too large");
+                    return;
+                }
+
+                try (java.io.OutputStream out = connection.getOutputStream()) {
                     out.write(body);
                 }
 
@@ -85,7 +114,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
                 InputStream stream = code >= 200 && code < 300
                         ? connection.getInputStream()
                         : connection.getErrorStream();
-                String response = readAll(stream);
+                String response = readAll(stream, MAX_RESPONSE_BYTES);
 
                 if (code < 200 || code >= 300) {
                     callback.onFailure("AI Gateway HTTP " + code);
@@ -100,22 +129,39 @@ public final class HttpOnlineGateway implements OnlineGateway {
                 JSONObject json = new JSONObject(response);
                 String assistantText = json.optString("content", "");
                 String toolCallJson = json.optString("tool_call", "");
+
+                if (assistantText.length() > MAX_RESPONSE_BYTES
+                        || toolCallJson.length() > MAX_REQUEST_TEXT) {
+                    callback.onFailure("AI Gateway response is too large");
+                    return;
+                }
+
                 callback.onSuccess(assistantText, toolCallJson);
             } catch (Exception e) {
                 callback.onFailure(e.getClass().getSimpleName() + ": " + safeMessage(e.getMessage()));
             } finally {
-                if (connection != null) connection.disconnect();
+                if (connection != null) {
+                    connection.disconnect();
+                }
             }
         });
     }
 
-    private static String readAll(InputStream stream) throws Exception {
+    private static String readAll(InputStream stream, int maxBytes) throws Exception {
         if (stream == null) return "";
         StringBuilder out = new StringBuilder();
+        int total = 0;
+        char[] buffer = new char[4096];
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) out.append(line);
+            int count;
+            while ((count = reader.read(buffer)) != -1) {
+                total += count;
+                if (total > maxBytes) {
+                    throw new IllegalStateException("response too large");
+                }
+                out.append(buffer, 0, count);
+            }
         }
         return out.toString();
     }
