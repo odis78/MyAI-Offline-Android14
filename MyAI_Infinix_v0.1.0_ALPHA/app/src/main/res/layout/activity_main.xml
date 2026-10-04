@@ -48,7 +48,7 @@
         android:id="@+id/sendCommandButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Отправить команду" />
+        android:text="Локально выполнить" />
 
     <Button
         android:id="@+id/chatgptButton"
