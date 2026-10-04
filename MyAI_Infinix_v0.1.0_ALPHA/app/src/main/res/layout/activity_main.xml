@@ -14,7 +14,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="MyAI — Инфиникс"
+            android:text="@string/main_title"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -28,7 +28,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="8dp"
-            android:text="Чат"
+            android:text="@string/chat_title"
             android:textStyle="bold" />
 
         <ScrollView
@@ -46,7 +46,7 @@
             android:id="@+id/commandInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Например: Пожалуйста, открой YouTube"
+            android:hint="@string/command_hint"
             android:inputType="text"
             android:singleLine="true" />
 
@@ -54,55 +54,55 @@
             android:id="@+id/sendCommandButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Локально выполнить" />
+            android:text="@string/send_local" />
 
         <Button
             android:id="@+id/gatewayButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="AI Gateway / Агент" />
+            android:text="@string/gateway" />
 
         <Button
             android:id="@+id/chatgptButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Открыть ChatGPT" />
+            android:text="@string/open_chatgpt" />
 
         <Button
             android:id="@+id/openAccessibilityButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Открыть специальные возможности" />
+            android:text="@string/accessibility_settings" />
 
         <Button
             android:id="@+id/homeButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Тест: Домой" />
+            android:text="@string/test_home" />
 
         <Button
             android:id="@+id/backButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Тест: Назад" />
+            android:text="@string/test_back" />
 
         <Button
             android:id="@+id/scrollButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Тест: Прокрутка вниз" />
+            android:text="@string/test_scroll" />
 
         <Button
             android:id="@+id/refreshButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Обновить статус" />
+            android:text="@string/refresh_status" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="8dp"
-            android:text="Журнал"
+            android:text="@string/journal"
             android:textStyle="bold" />
 
         <ScrollView
@@ -116,6 +116,5 @@
                 android:layout_height="wrap_content"
                 android:textSize="13sp" />
         </ScrollView>
-
     </LinearLayout>
 </ScrollView>
