@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="MyAI — AI Gateway"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/gatewayEndpoint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="https://server/v1/message"
+        android:inputType="textUri"
+        android:singleLine="true" />
+
+    <EditText
+        android:id="@+id/gatewayMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Например: Пожалуйста, открой настройки"
+        android:inputType="text"
+        android:singleLine="true" />
+
+    <Button
+        android:id="@+id/gatewaySendButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Отправить AI-команде" />
+
+    <Button
+        android:id="@+id/gatewayBackButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Назад в MyAI" />
+
+    <ScrollView
+        android:id="@+id/gatewayChatScroll"
+        android:layout_width="match_parent"
+        android:layout_height="180dp">
+        <TextView
+            android:id="@+id/gatewayChat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+    </ScrollView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Gateway журнал"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:id="@+id/gatewayLogScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <TextView
+            android:id="@+id/gatewayLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp" />
+    </ScrollView>
+</LinearLayout>
