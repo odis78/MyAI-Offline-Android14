@@ -22,6 +22,7 @@ r = Path(".").resolve()
 
 expected = [
     r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java",
+    r / "app/src/main/java/com/dmitry/myai/infinix/GatewayActivity.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/CommandParser.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentCommandParser.java",
     r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentResultCodec.java",
@@ -42,6 +43,7 @@ for p in (r / "app/src/main").rglob("*"):
 for p in [
     r / "app/src/main/AndroidManifest.xml",
     r / "app/src/main/res/layout/activity_main.xml",
+    r / "app/src/main/res/layout/activity_gateway.xml",
     r / "app/src/main/res/values/strings.xml",
     r / "app/src/main/res/values/styles.xml",
     r / "app/src/main/res/xml/accessibility_service_config.xml",
@@ -80,7 +82,7 @@ layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="u
 for marker in [
     "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
     "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand",
-    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec"
+    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec", "GatewayActivity"
 ]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
@@ -116,9 +118,9 @@ for marker in [
         raise SystemExit(f"Accessibility marker missing: {marker}")
 
 for view_id in [
-    "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton",
+    "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "gatewayButton",
     "chatgptButton", "logText", "openAccessibilityButton", "homeButton",
-    "backButton", "scrollButton", "refreshButton", "logScroll"
+    "backButton", "scrollButton", "refreshButton", "logScroll", "gatewayEndpoint", "gatewayMessage", "gatewaySendButton"
 ]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
