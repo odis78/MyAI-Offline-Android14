@@ -36,7 +36,7 @@ public class AgentCommandParserTest {
 
     @Test public void modelRejectsInvalidNestedJson() {
         assertEquals(AgentContracts.Action.NONE,
-                AgentCommandParser.fromModelJson("{\"type\":\"tool_call\",\"tool\":\"open_app\",\"arguments\":"));
+                AgentCommandParser.fromModelJson("{\"type\":\"tool_call\",\"tool\":\"open_app\",\"arguments\":").action());
     }
 
     @Test public void modelRejectsUnknownTool() {
