@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - infinix-agent-fixed
+  pull_request:
+    branches:
+      - infinix-chatgpt
 
 permissions:
   contents: read
