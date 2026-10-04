@@ -1,4 +1,5 @@
 name: Build MyAI Infinix — ChatGPT + Control Bridge + Agent FIXED
+# CI trigger: rebuild after static fixes
 
 on:
   workflow_dispatch:
