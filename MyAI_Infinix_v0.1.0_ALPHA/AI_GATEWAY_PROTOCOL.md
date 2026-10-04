@@ -50,3 +50,5 @@ A future gateway can use OpenAI Responses API as its model backend and perform t
 <!-- sanity path revision -->
 
 <!-- diagnostic path revision -->
+
+<!-- workflow rewrite validation -->
