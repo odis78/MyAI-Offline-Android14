@@ -45,9 +45,9 @@ for p in [
     ET.parse(p)
 
 manifest = (r / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
-if "com.dmitry.myai.infinix.MainActivity" not in manifest:
+if not ("android:name=\".MainActivity\"" in manifest or "com.dmitry.myai.infinix.MainActivity" in manifest):
     raise SystemExit("Manifest missing MainActivity")
-if "com.dmitry.myai.infinix.bridge.MyAiAccessibilityService" not in manifest:
+if not ("android:name=\".bridge.MyAiAccessibilityService\"" in manifest or "com.dmitry.myai.infinix.bridge.MyAiAccessibilityService" in manifest):
     raise SystemExit("Manifest missing AccessibilityService")
 
 java_files = list((r / "app/src/main/java").rglob("*.java"))
