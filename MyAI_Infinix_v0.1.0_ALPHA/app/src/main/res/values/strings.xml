@@ -1,1 +1,23 @@
-<resources><string name="app_name">MyAI Инфиникс</string><string name="accessibility_desc">MyAI Control Bridge для управления Android.</string></resources>
+<resources>
+    <string name="app_name">MyAI — Инфиникс</string>
+    <string name="accessibility_service_name">MyAI Control Bridge</string>
+    <string name="accessibility_desc">MyAI Control Bridge для явного управления Android по команде пользователя.</string>
+    <string name="main_title">MyAI — Инфиникс</string>
+    <string name="chat_title">Чат</string>
+    <string name="command_hint">Например: Пожалуйста, открой YouTube</string>
+    <string name="send_local">Локально выполнить</string>
+    <string name="gateway">AI Gateway / Агент</string>
+    <string name="open_chatgpt">Открыть ChatGPT</string>
+    <string name="accessibility_settings">Открыть специальные возможности</string>
+    <string name="test_home">Тест: Домой</string>
+    <string name="test_back">Тест: Назад</string>
+    <string name="test_scroll">Тест: Прокрутка вниз</string>
+    <string name="refresh_status">Обновить статус</string>
+    <string name="journal">Журнал</string>
+    <string name="gateway_title">MyAI — AI Gateway</string>
+    <string name="gateway_endpoint_hint">https://server/v1/message</string>
+    <string name="gateway_message_hint">Например: Пожалуйста, открой настройки</string>
+    <string name="gateway_send">Отправить AI-команде</string>
+    <string name="gateway_back">Назад в MyAI</string>
+    <string name="gateway_journal">Gateway журнал</string>
+</resources>
