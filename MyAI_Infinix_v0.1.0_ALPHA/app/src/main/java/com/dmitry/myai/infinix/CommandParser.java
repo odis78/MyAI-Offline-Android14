@@ -10,17 +10,19 @@ public final class CommandParser {
         String s = raw.toLowerCase(Locale.ROOT).replace('ё', 'е').trim();
         s = s.replaceAll("[\\p{Punct}]+", " ");
         s = s.replaceAll("\\s+", " ").trim();
-        s = stripPolitePrefix(s);\n        if (s.startsWith("открыть ")) s = "открой " + s.substring(8).trim();\n        if (s.startsWith("запустить ")) s = "запусти " + s.substring(10).trim();\n        return s;
+        s = stripPolitePrefix(s);
+        if (s.startsWith("открыть ")) s = "открой " + s.substring(8).trim();
+        if (s.startsWith("запустить ")) s = "запусти " + s.substring(10).trim();
+        return s;
     }
 
     private static String stripPolitePrefix(String s) {
         String[] prefixes = {
                 "пожалуйста ",
-                "пожалуйста, ",
-                "можешь ",
                 "можешь ли ",
-                "можно ",
+                "можешь ",
                 "можно ли ",
+                "можно ",
                 "прошу ",
                 "давай "
         };
@@ -50,8 +52,9 @@ public final class CommandParser {
     }
 
     public static boolean containsAny(String text, String... values) {
+        if (text == null) return false;
         for (String value : values) {
-            if (text.contains(value)) return true;
+            if (value != null && text.contains(value)) return true;
         }
         return false;
     }
