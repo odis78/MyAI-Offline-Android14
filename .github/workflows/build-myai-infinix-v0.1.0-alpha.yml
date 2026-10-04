@@ -1,6 +1,9 @@
 name: Build MyAI Infinix v0.1.0 ALPHA
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - infinix
 permissions:
   contents: read
 env:
