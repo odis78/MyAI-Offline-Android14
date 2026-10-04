@@ -72,6 +72,8 @@ for p in java_files:
 
 main = (r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java").read_text(encoding="utf-8")
 parser = (r / "app/src/main/java/com/dmitry/myai/infinix/CommandParser.java").read_text(encoding="utf-8")
+agent_parser = (r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentCommandParser.java").read_text(encoding="utf-8")
+gateway = (r / "app/src/main/java/com/dmitry/myai/infinix/online/HttpOnlineGateway.java").read_text(encoding="utf-8")
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
 
@@ -84,10 +86,26 @@ for marker in [
         raise SystemExit(f"MainActivity marker missing: {marker}")
 
 for marker in [
-    "normalize", "stripPolitePrefix", "пожалуйста ", "можешь ", "extractApp", "fromNaturalLanguage", "fromModelJson"
+    "normalize", "stripPolitePrefix", "пожалуйста ", "можешь ", "extractApp"
 ]:
     if marker not in parser:
         raise SystemExit(f"CommandParser marker missing: {marker}")
+
+for marker in ["fromNaturalLanguage", "fromModelJson", "open_app", "tool_call"]:
+    if marker not in agent_parser:
+        raise SystemExit(f"AgentCommandParser marker missing: {marker}")
+
+for marker in ["HttpURLConnection", "setConnectTimeout", "setReadTimeout", "Content-Type", "session_id", "tool_call"]:
+    if marker not in gateway:
+        raise SystemExit(f"HttpOnlineGateway marker missing: {marker}")
+
+all_source = "\n".join(
+    p.read_text(encoding="utf-8", errors="ignore")
+    for p in (r / "app/src/main").rglob("*") if p.is_file()
+)
+for forbidden in ["sk-", "OPENAI_API_KEY", "Authorization: Bearer", "api_key"]:
+    if forbidden in all_source:
+        raise SystemExit(f"Potential credential leakage marker found: {forbidden}")
 
 for marker in [
     "GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction",
