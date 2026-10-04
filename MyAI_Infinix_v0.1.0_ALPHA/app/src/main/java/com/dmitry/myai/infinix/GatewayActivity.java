@@ -161,8 +161,43 @@ public final class GatewayActivity extends Activity {
 
         AgentContracts.AgentResult result =
                 new AgentContracts.AgentResult(command.requestId(), command.action(), ok, message);
+        String resultJson = AgentResultCodec.toJson(result);
         appendChat("MyAI: " + message);
-        append("RESULT: " + AgentResultCodec.toJson(result));
+        append("RESULT: " + resultJson);
+        sendToolResult(command, resultJson);
+    }
+
+    private void sendToolResult(AgentContracts.AgentCommand command, String resultJson) {
+        if (gateway == null) {
+            append("TOOL_RESULT: not sent (Gateway inactive)");
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String session = prefs.getString(PREF_SESSION, "default");
+        gateway.sendToolResult(session, resultJson, new HttpOnlineGateway.Callback() {
+            @Override public void onSuccess(String assistantText, String toolCallJson) {
+                runOnUiThread(() -> {
+                    append("TOOL_RESULT: HTTP 2xx requestId=" + command.requestId());
+                    if (assistantText != null && !assistantText.isBlank()) {
+                        appendChat("AI: " + assistantText);
+                    }
+                    if (toolCallJson != null && !toolCallJson.isBlank()) {
+                        append("FOLLOW_UP_TOOL_CALL: " + toolCallJson);
+                        AgentContracts.AgentCommand followUp =
+                                AgentCommandParser.fromModelJson(toolCallJson);
+                        if (followUp.action() != AgentContracts.Action.NONE) {
+                            execute(followUp);
+                        } else {
+                            append("FOLLOW_UP_TOOL_CALL REJECTED");
+                        }
+                    }
+                });
+            }
+
+            @Override public void onFailure(String error) {
+                runOnUiThread(() -> append("TOOL_RESULT FAILED: " + error));
+            }
+        });
     }
 
     private Intent findLaunchIntentByName(String requested) {
