@@ -18,13 +18,8 @@ public final class CommandParser {
 
     private static String stripPolitePrefix(String s) {
         String[] prefixes = {
-                "пожалуйста ",
-                "можешь ли ",
-                "можешь ",
-                "можно ли ",
-                "можно ",
-                "прошу ",
-                "давай "
+                "пожалуйста ", "пожалуйста, ", "можешь ", "можешь ли ",
+                "можно ", "можно ли ", "прошу ", "давай "
         };
         boolean changed;
         do {
@@ -52,9 +47,8 @@ public final class CommandParser {
     }
 
     public static boolean containsAny(String text, String... values) {
-        if (text == null) return false;
         for (String value : values) {
-            if (value != null && text.contains(value)) return true;
+            if (text.contains(value)) return true;
         }
         return false;
     }
