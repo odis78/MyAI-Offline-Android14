@@ -135,7 +135,7 @@ for checked in [
 ]:
     raw = checked.read_text(encoding="utf-8")
     if r"\\n" in raw:
-        raise SystemExit(f"Literal \\n sequence found where real line breaks are required: {checked.relative_to(r)}")
+        raise SystemExit(f"Literal \\n sequence found where real line breaks are required: {checked}")
 
 for bad in ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "platform-tools "]:
     for p in r.rglob("*"):
