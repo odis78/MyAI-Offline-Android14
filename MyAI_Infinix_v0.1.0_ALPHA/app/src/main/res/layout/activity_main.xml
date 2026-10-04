@@ -51,6 +51,12 @@
         android:text="Локально выполнить" />
 
     <Button
+        android:id="@+id/gatewayButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="AI Gateway / Агент" />
+
+    <Button
         android:id="@+id/chatgptButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
