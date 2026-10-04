@@ -32,6 +32,7 @@ public final class GatewayActivity extends Activity {
     private TextView chat;
     private TextView log;
     private HttpOnlineGateway gateway;
+    private int toolChainDepth = 0;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -75,6 +76,7 @@ public final class GatewayActivity extends Activity {
             prefs.edit().putString(PREF_SESSION, session).apply();
         }
 
+        toolChainDepth = 0;
         appendChat("Вы: " + text);
         append("REQUEST session=" + session);
         message.setText("");
@@ -116,6 +118,12 @@ public final class GatewayActivity extends Activity {
     }
 
     private void execute(AgentContracts.AgentCommand command) {
+        if (toolChainDepth >= 3) {
+            appendChat("MyAI: цепочка команд остановлена после 3 шагов.");
+            append("TOOL_CHAIN STOPPED: max depth=3");
+            return;
+        }
+        toolChainDepth++;
         boolean ok = false;
         String message;
 
