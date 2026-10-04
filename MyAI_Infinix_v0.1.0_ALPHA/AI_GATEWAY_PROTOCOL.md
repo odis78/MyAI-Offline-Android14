@@ -56,3 +56,5 @@ A future gateway can use OpenAI Responses API as its model backend and perform t
 <!-- final sanity newline guard -->
 
 <!-- codec compile fix -->
+
+<!-- MainActivity agent compile fix -->
