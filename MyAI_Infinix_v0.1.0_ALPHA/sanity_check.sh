@@ -131,7 +131,7 @@ for view_id in [
 
 for checked in [
     r / "app/build.gradle",
-    r / ".github/workflows/build-myai-infinix-v0.1.0-alpha.yml"
+    r.parent / ".github/workflows/build-myai-infinix-v0.1.0-alpha.yml"
 ]:
     raw = checked.read_text(encoding="utf-8")
     if r"\\n" in raw:
