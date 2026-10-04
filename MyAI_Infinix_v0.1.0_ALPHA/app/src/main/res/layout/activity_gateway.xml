@@ -1,76 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/gatewayRootScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gateway_title"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/gatewayEndpoint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/gateway_endpoint_hint"
-            android:inputType="textUri"
-            android:singleLine="true" />
-
-        <EditText
-            android:id="@+id/gatewayMessage"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/gateway_message_hint"
-            android:inputType="text"
-            android:singleLine="true" />
-
-        <Button
-            android:id="@+id/gatewaySendButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gateway_send" />
-
-        <Button
-            android:id="@+id/gatewayBackButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gateway_back" />
-
-        <ScrollView
-            android:id="@+id/gatewayChatScroll"
-            android:layout_width="match_parent"
-            android:layout_height="180dp">
-            <TextView
-                android:id="@+id/gatewayChat"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="14sp" />
-        </ScrollView>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gateway_journal"
-            android:textStyle="bold" />
-
-        <ScrollView
-            android:id="@+id/gatewayLogScroll"
-            android:layout_width="match_parent"
-            android:layout_height="280dp">
-            <TextView
-                android:id="@+id/gatewayLog"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="12sp" />
-        </ScrollView>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/gateway_title" android:textSize="22sp" android:textStyle="bold" />
+        <EditText android:id="@+id/gatewayEndpoint" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:autofillHints="url"
+            android:hint="@string/gateway_endpoint_hint" android:inputType="textUri" android:singleLine="true" />
+        <EditText android:id="@+id/gatewayMessage" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:importantForAutofill="no"
+            android:hint="@string/gateway_message_hint" android:inputType="text" android:singleLine="true" />
+        <Button android:id="@+id/gatewaySendButton" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/gateway_send" />
+        <Button android:id="@+id/gatewayBackButton" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/gateway_back" />
+        <TextView android:id="@+id/gatewayChat" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minHeight="180dp" android:textSize="14sp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/gateway_journal" android:textStyle="bold" />
+        <TextView android:id="@+id/gatewayLog" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
