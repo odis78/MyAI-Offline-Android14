@@ -2,23 +2,27 @@ package com.dmitry.myai.infinix;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 
+import java.util.Locale;
+
 public class MainActivity extends Activity {
     private TextView statusText;
     private TextView logText;
+    private EditText commandInput;
     private final Handler handler = new Handler();
+    private String lastStatus = null;
 
-    private interface TestAction {
-        boolean run();
-    }
+    private interface TestAction { boolean run(); }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +31,7 @@ public class MainActivity extends Activity {
 
         statusText = findViewById(R.id.statusText);
         logText = findViewById(R.id.logText);
+        commandInput = findViewById(R.id.commandInput);
 
         findViewById(R.id.openAccessibilityButton).setOnClickListener(
                 v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
@@ -34,12 +39,131 @@ public class MainActivity extends Activity {
         findViewById(R.id.backButton).setOnClickListener(v -> testBack());
         findViewById(R.id.scrollButton).setOnClickListener(v -> testScroll());
         findViewById(R.id.refreshButton).setOnClickListener(v -> refresh());
+        findViewById(R.id.sendCommandButton).setOnClickListener(v -> submitCommand());
 
         refresh();
     }
 
+    private void submitCommand() {
+        String raw = commandInput.getText().toString().trim();
+        if (raw.isEmpty()) {
+            append("КОМАНДА: пустая");
+            return;
+        }
+        append("Вы: " + raw);
+        commandInput.setText("");
+
+        String command = raw.toLowerCase(Locale.ROOT).replace('ё', 'е').trim();
+
+        if (containsAny(command, "домой", "на главный экран", "рабочий стол")) {
+            executeBridgeCommand("HOME", MyAiAccessibilityService::home,
+                    "Готово: открыл рабочий стол.");
+            return;
+        }
+        if (containsAny(command, "назад", "вернись назад", "вернуться назад")) {
+            executeBridgeCommand("BACK", MyAiAccessibilityService::back,
+                    "Готово: выполнил команду «Назад».");
+            return;
+        }
+        if (containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
+            executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
+                    "Готово: прокрутил экран вниз.");
+            return;
+        }
+
+        String app = extractApp(command);
+        if (app != null) {
+            openKnownApp(app);
+            return;
+        }
+
+        if (containsAny(command, "настройки", "открой настройки")) {
+            openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
+                    "Готово: открыл настройки Android.");
+            return;
+        }
+
+        append("MyAI: Я пока не знаю эту команду. Попробуй: «Домой», «Назад», «Прокрути вниз», «Открой YouTube», «Открой настройки».");
+        append("COMMAND UNKNOWN");
+    }
+
+    private String extractApp(String command) {
+        String[] prefixes = {"открой ", "запусти ", "открыть ", "запустить "};
+        for (String prefix : prefixes) {
+            if (command.startsWith(prefix)) {
+                String value = command.substring(prefix.length()).trim();
+                if (!value.isEmpty()) return value;
+            }
+        }
+        return null;
+    }
+
+    private void openKnownApp(String app) {
+        if (app.contains("youtube") || app.contains("ютуб")) {
+            Intent intent = getPackageManager().getLaunchIntentForPackage("com.google.android.youtube");
+            if (intent != null) {
+                openExternalIntent(intent, "OPEN_YOUTUBE", "Готово: открыл YouTube.");
+            } else {
+                openExternalIntent(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")),
+                        "OPEN_YOUTUBE", "Открыл ссылку YouTube в доступном браузере.");
+            }
+            return;
+        }
+        if (app.contains("камер")) {
+            openExternalIntent(new Intent("android.media.action.IMAGE_CAPTURE"),
+                    "OPEN_CAMERA", "Готово: открыл камеру.");
+            return;
+        }
+        if (app.contains("галере") || app.contains("фото")) {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setType("image/*");
+            openExternalIntent(intent, "OPEN_GALLERY", "Готово: открыл галерею.");
+            return;
+        }
+        if (app.contains("настрой")) {
+            openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
+                    "Готово: открыл настройки Android.");
+            return;
+        }
+        append("MyAI: пока не умею открывать приложение «" + app + "».");
+        append("OPEN_APP FAILED: unknown app");
+    }
+
+    private void openExternalIntent(Intent intent, String action, String successMessage) {
+        try {
+            if (intent.resolveActivity(getPackageManager()) == null) {
+                append("MyAI: не найдено приложение для команды «" + action + "».");
+                append(action + ": FAILED");
+                return;
+            }
+            startActivity(intent);
+            append(successMessage);
+            append(action + ": SUCCESS");
+        } catch (Exception e) {
+            append("MyAI: ошибка запуска " + action + ": " + e.getMessage());
+            append(action + ": FAILED");
+        }
+    }
+
+    private void executeBridgeCommand(String name, TestAction action, String successMessage) {
+        if (!MyAiAccessibilityService.isConnected()) {
+            append("MyAI: Control Bridge не подключен.");
+            append(name + ": FAILED (BRIDGE OFF)");
+            return;
+        }
+        try {
+            boolean ok = action.run();
+            append(ok ? successMessage : "MyAI: команда «" + name + "» не выполнена.");
+            append(name + ": " + (ok ? "SUCCESS" : "FAILED"));
+        } catch (Exception e) {
+            append("MyAI: ошибка " + name + ": " + e.getMessage());
+            append(name + ": FAILED");
+        }
+    }
+
     private void testHome() {
-        runTest(() -> MyAiAccessibilityService.home(), "HOME");
+        executeBridgeCommand("HOME TEST", MyAiAccessibilityService::home,
+                "Готово: тест Home выполнен.");
     }
 
     private void testBack() {
@@ -47,13 +171,12 @@ public class MainActivity extends Activity {
             append("ERROR: Control Bridge not connected");
             return;
         }
-
         append("BACK test: opening Android Settings...");
         try {
             startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> runTest(
-                    () -> MyAiAccessibilityService.back(),
-                    "BACK on Settings"), 1200);
+            handler.postDelayed(() -> executeBridgeCommand("BACK TEST",
+                    MyAiAccessibilityService::back,
+                    "Готово: тест Back выполнен."), 1200);
         } catch (Exception e) {
             append("ERROR opening Settings: " + e.getMessage());
         }
@@ -64,24 +187,14 @@ public class MainActivity extends Activity {
             append("ERROR: Control Bridge not connected");
             return;
         }
-
         append("SCROLL test: opening Android Settings...");
         try {
             startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> runTest(
-                    () -> MyAiAccessibilityService.scrollDown(),
-                    "SCROLL on Settings"), 1200);
+            handler.postDelayed(() -> executeBridgeCommand("SCROLL TEST",
+                    MyAiAccessibilityService::scrollDown,
+                    "Готово: тест прокрутки выполнен."), 1200);
         } catch (Exception e) {
             append("ERROR opening Settings: " + e.getMessage());
-        }
-    }
-
-    private void runTest(TestAction action, String name) {
-        try {
-            boolean ok = action.run();
-            append("TEST " + name + ": " + (ok ? "SUCCESS" : "FAILED"));
-        } catch (Exception e) {
-            append("ERROR " + name + ": " + e.getMessage());
         }
     }
 
@@ -90,7 +203,15 @@ public class MainActivity extends Activity {
                 ? "Control Bridge: ПОДКЛЮЧЕН"
                 : "Control Bridge: НЕ ПОДКЛЮЧЕН";
         statusText.setText(status);
-        append(status);
+        if (!status.equals(lastStatus)) {
+            append(status);
+            lastStatus = status;
+        }
+    }
+
+    private boolean containsAny(String text, String... values) {
+        for (String value : values) if (text.contains(value)) return true;
+        return false;
     }
 
     private void append(String message) {
