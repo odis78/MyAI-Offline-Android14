@@ -68,7 +68,7 @@ main = (r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java").read_
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
 
-for marker in ["ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh", "ACTION_SETTINGS", "postDelayed"]:
+for marker in ["ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh", "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand", "OPEN_YOUTUBE"]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
 
@@ -76,7 +76,7 @@ for marker in ["GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction"
     if marker not in bridge:
         raise SystemExit(f"Accessibility marker missing: {marker}")
 
-for view_id in ["statusText", "logText", "openAccessibilityButton", "homeButton", "backButton", "scrollButton", "refreshButton", "logScroll"]:
+for view_id in ["statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "logText", "openAccessibilityButton", "homeButton", "backButton", "scrollButton", "refreshButton", "logScroll"]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
 
