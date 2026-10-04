@@ -22,11 +22,40 @@ public final class HttpOnlineGateway implements OnlineGateway {
 
     @Override
     public boolean isAvailable() {
-        return !endpoint.isEmpty() && (endpoint.startsWith("https://") || endpoint.startsWith("http://"));
+        return !endpoint.isEmpty()
+                && (endpoint.startsWith("https://") || endpoint.startsWith("http://"));
     }
 
     @Override
     public void send(String sessionId, String userText, Callback callback) {
+        postJson(buildRequest(sessionId, userText), callback, true);
+    }
+
+    public void sendToolResult(String sessionId, String resultJson, Callback callback) {
+        if (resultJson == null || resultJson.isBlank()) {
+            callback.onFailure("empty tool result");
+            return;
+        }
+        try {
+            JSONObject result = new JSONObject(resultJson);
+            JSONObject request = new JSONObject();
+            request.put("session_id", sessionId == null ? "default" : sessionId);
+            request.put("type", "tool_result");
+            request.put("tool_result", result);
+            postJson(request, callback, false);
+        } catch (Exception e) {
+            callback.onFailure("invalid tool result: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private JSONObject buildRequest(String sessionId, String userText) {
+        JSONObject request = new JSONObject();
+        request.put("session_id", sessionId == null ? "default" : sessionId);
+        request.put("content", userText == null ? "" : userText);
+        return request;
+    }
+
+    private void postJson(JSONObject request, Callback callback, boolean expectAssistantResponse) {
         if (!isAvailable()) {
             callback.onFailure("AI Gateway is not configured");
             return;
@@ -35,10 +64,6 @@ public final class HttpOnlineGateway implements OnlineGateway {
         executor.execute(() -> {
             HttpURLConnection connection = null;
             try {
-                JSONObject request = new JSONObject();
-                request.put("session_id", sessionId == null ? "default" : sessionId);
-                request.put("content", userText == null ? "" : userText);
-
                 connection = (HttpURLConnection) new URL(endpoint).openConnection();
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(8000);
@@ -56,10 +81,15 @@ public final class HttpOnlineGateway implements OnlineGateway {
                 InputStream stream = code >= 200 && code < 300
                         ? connection.getInputStream()
                         : connection.getErrorStream();
-
                 String response = readAll(stream);
+
                 if (code < 200 || code >= 300) {
                     callback.onFailure("AI Gateway HTTP " + code);
+                    return;
+                }
+
+                if (!expectAssistantResponse) {
+                    callback.onSuccess("", "");
                     return;
                 }
 
