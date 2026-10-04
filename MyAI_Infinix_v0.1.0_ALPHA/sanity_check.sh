@@ -78,11 +78,13 @@ agent_parser = (r / "app/src/main/java/com/dmitry/myai/infinix/agent/AgentComman
 gateway = (r / "app/src/main/java/com/dmitry/myai/infinix/online/HttpOnlineGateway.java").read_text(encoding="utf-8")
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
+gateway_activity = (r / "app/src/main/java/com/dmitry/myai/infinix/GatewayActivity.java").read_text(encoding="utf-8")
+gateway_layout = (r / "app/src/main/res/layout/activity_gateway.xml").read_text(encoding="utf-8")
 
 for marker in [
     "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
     "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand",
-    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec", "GatewayActivity"
+    "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec"
 ]:
     if marker not in main:
         raise SystemExit(f"MainActivity marker missing: {marker}")
