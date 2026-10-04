@@ -292,13 +292,13 @@ public final class GatewayActivity extends Activity {
 
     private void appendChat(String value) {
         chat.append(value + "\n");
-        chat.post(() -> ((ScrollView) findViewById(R.id.gatewayChatScroll))
+        chat.post(() -> ((ScrollView) findViewById(R.id.gatewayRootScroll))
                 .fullScroll(View.FOCUS_DOWN));
     }
 
     private void append(String value) {
         log.append(value + "\n");
-        log.post(() -> ((ScrollView) findViewById(R.id.gatewayLogScroll))
+        log.post(() -> ((ScrollView) findViewById(R.id.gatewayRootScroll))
                 .fullScroll(View.FOCUS_DOWN));
     }
 
