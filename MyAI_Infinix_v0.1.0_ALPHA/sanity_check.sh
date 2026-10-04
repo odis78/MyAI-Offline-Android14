@@ -65,6 +65,7 @@ main = (r / "app/src/main/java/com/dmitry/myai/infinix/MainActivity.java").read_
 bridge = (r / "app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java").read_text(encoding="utf-8")
 layout = (r / "app/src/main/res/layout/activity_main.xml").read_text(encoding="utf-8")
 gradle = (r / "app/build.gradle").read_text(encoding="utf-8")
+root_gradle = (r / "build.gradle").read_text(encoding="utf-8")
 settings = (r / "settings.gradle").read_text(encoding="utf-8")
 
 for marker in ["ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh", "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand", "OPEN_YOUTUBE"]:
@@ -76,7 +77,8 @@ for marker in ["GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction"
 for view_id in ["statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "logText", "openAccessibilityButton", "homeButton", "backButton", "scrollButton", "refreshButton", "logScroll"]:
     assert view_id in layout, f"Required UI id missing: {view_id}"
 
-assert "com.android.application" in gradle and "8.9.2" in gradle, "Unexpected Android Gradle Plugin configuration"
+assert "com.android.application" in root_gradle and "8.9.2" in root_gradle, "Unexpected Android Gradle Plugin configuration"
+assert "com.android.application" in gradle, "App module does not apply Android application plugin"
 assert "include ':app'" in settings, "App module is not included"
 
 # Reject known corruption/typos from earlier revisions.
@@ -91,3 +93,5 @@ for base in scan_roots:
 
 print("STATIC SANITY: PASS")
 print(f"JAVA SOURCES: {len(java_files)}")
+
+PY
