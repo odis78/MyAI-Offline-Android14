@@ -120,8 +120,21 @@ public class MainActivity extends Activity {
             if (intent != null) {
                 openExternalIntent(intent, "OPEN_YOUTUBE", "Готово: открыл YouTube.");
             } else {
-                appendChat("MyAI: YouTube не установлен.");
-                append("OPEN_YOUTUBE: FAILED (APP NOT INSTALLED)");
+                // Some Android builds use a different YouTube package. Fall back
+                // to launcher-name resolution instead of reporting a false
+                // "not installed" result.
+                Intent fallback = findLaunchIntentByName("youtube");
+                if (fallback == null) {
+                    fallback = findLaunchIntentByName(normalized);
+                }
+                if (fallback != null) {
+                    String label = fallback.getStringExtra("myai.label");
+                    if (label == null || label.isEmpty()) label = "YouTube";
+                    openExternalIntent(fallback, "OPEN_YOUTUBE", "Готово: открыл " + label + ".");
+                } else {
+                    appendChat("MyAI: YouTube не найден среди установленных приложений.");
+                    append("OPEN_YOUTUBE: FAILED (APP NOT FOUND)");
+                }
             }
             return;
         }
