@@ -46,3 +46,5 @@ A future gateway can use OpenAI Responses API as its model backend and perform t
 <!-- sanity checker fix revision -->
 
 <!-- gradle-format validation revision -->
+
+<!-- sanity path revision -->
