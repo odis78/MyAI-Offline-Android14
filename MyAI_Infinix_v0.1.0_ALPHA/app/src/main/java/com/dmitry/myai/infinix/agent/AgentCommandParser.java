@@ -41,7 +41,11 @@ public final class AgentCommandParser {
         }
 
         try {
-            JSONObject input = new JSONObject(raw.trim());
+            String jsonText = raw.trim();
+            if (!jsonText.startsWith("{") || !jsonText.endsWith("}")) {
+                return AgentContracts.AgentCommand.none("model-invalid");
+            }
+            JSONObject input = new JSONObject(jsonText);
             String requestId = input.optString("request_id", "").trim();
             if (requestId.isEmpty()) requestId = UUID.randomUUID().toString();
 
