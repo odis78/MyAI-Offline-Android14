@@ -60,56 +60,60 @@ public class MainActivity extends Activity {
             append("COMMAND EMPTY");
             return;
         }
+
         appendChat("Вы: " + raw);
         commandInput.setText("");
 
-        String command = CommandParser.normalize(raw);
+        AgentContracts.AgentCommand command;
+        if (raw.startsWith("{")) {
+            command = AgentCommandParser.fromModelJson(raw);
+            append("AGENT INPUT: MODEL TOOL PROTOCOL");
+        } else {
+            command = AgentCommandParser.fromNaturalLanguage(raw);
+            append("AGENT INPUT: NATURAL LANGUAGE");
+        }
 
-        if (CommandParser.containsAny(command, "домой", "на главный экран", "рабочий стол")) {
-            append("COMMAND RECOGNIZED: HOME");
-            executeBridgeCommand("HOME", MyAiAccessibilityService::home,
-                    "Готово: открыл рабочий стол.");
-            return;
-        }
-        if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад")) {
-            append("COMMAND RECOGNIZED: BACK");
-            executeBridgeCommand("BACK", MyAiAccessibilityService::back,
-                    "Готово: выполнил команду «Назад».");
-            return;
-        }
-        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
-            append("COMMAND RECOGNIZED: SCROLL_DOWN");
-            executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
-                    "Готово: прокрутил экран вниз.");
+        if (command.action() == AgentContracts.Action.NONE) {
+            appendChat("MyAI: Я пока не знаю эту команду.");
+            appendChat("MyAI: Попробуй «Домой», «Назад», «Прокрути вниз», «Открой YouTube», «Открой ChatGPT» или «Открой настройки».");
+            append("COMMAND UNKNOWN requestId=" + command.requestId());
             return;
         }
 
-        if (CommandParser.containsAny(command, "открой чатgpt", "запусти чатgpt",
-                "открыть чатgpt", "запустить чатgpt",
-                "открой chatgpt", "запусти chatgpt",
-                "открыть chatgpt", "запустить chatgpt")) {
-            append("COMMAND RECOGNIZED: OPEN_CHATGPT");
-            openChatGPT();
-            return;
-        }
+        executeAgentCommand(command);
+    }
 
-        String app = CommandParser.extractApp(command);
-        if (app != null) {
-            append("COMMAND RECOGNIZED: OPEN_APP " + app);
-            openKnownApp(app);
-            return;
+    private void executeAgentCommand(AgentContracts.AgentCommand command) {
+        switch (command.action()) {
+            case HOME -> {
+                append("AGENT TOOL: HOME requestId=" + command.requestId());
+                executeBridgeCommand(command, MyAiAccessibilityService::home,
+                        "Готово: открыл рабочий стол.");
+            }
+            case BACK -> {
+                append("AGENT TOOL: BACK requestId=" + command.requestId());
+                executeBridgeCommand(command, MyAiAccessibilityService::back,
+                        "Готово: выполнил команду «Назад».");
+            }
+            case SCROLL_DOWN -> {
+                append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
+                executeBridgeCommand(command, MyAiAccessibilityService::scrollDown,
+                        "Готово: прокрутил экран вниз.");
+            }
+            case OPEN_APP -> {
+                append("AGENT TOOL: OPEN_APP payload=" + command.payload() +
+                        " requestId=" + command.requestId());
+                openKnownApp(command.payload(), command.requestId());
+            }
+            case OPEN_SETTINGS -> {
+                append("AGENT TOOL: OPEN_SETTINGS requestId=" + command.requestId());
+                openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
+                        "Готово: открыл настройки Android.");
+            }
+            case NONE -> {
+                append("AGENT TOOL: NONE");
+            }
         }
-
-        if (CommandParser.containsAny(command, "настройки", "открой настройки")) {
-            append("COMMAND RECOGNIZED: OPEN_SETTINGS");
-            openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
-                    "Готово: открыл настройки Android.");
-            return;
-        }
-
-        appendChat("MyAI: Я пока не знаю эту команду.");
-        appendChat("MyAI: Попробуй «Домой», «Назад», «Прокрути вниз», «Открой YouTube», «Открой ChatGPT» или «Открой настройки».");
-        append("COMMAND UNKNOWN");
     }
 
     private void openChatGPT() {
@@ -130,7 +134,7 @@ public class MainActivity extends Activity {
         openExternalIntent(intent, "OPEN_CHATGPT", "Готово: открыл ChatGPT.");
     }
 
-    private void openKnownApp(String app) {
+    private void openKnownApp(String app) {\n        openKnownApp(app, "local");\n    }\n\n    private void openKnownApp(String app, String requestId) {
         String normalized = normalizeAppName(app);
 
         if (matchesApp(normalized, "chatgpt", "чатgпт", "чатgpt", "чатгпт", "чатджпт")) {
@@ -281,7 +285,7 @@ public class MainActivity extends Activity {
             }
             startActivity(intent);
             appendChat(successMessage);
-            append(action + ": SUCCESS");
+            append(action + ": SUCCESS requestId=" + requestId);
         } catch (Exception e) {
             appendChat("MyAI: ошибка запуска " + action + ".");
             append(action + ": FAILED: " + e.getClass().getSimpleName());
@@ -301,6 +305,31 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             appendChat("MyAI: ошибка выполнения команды «" + name + "».");
             append(name + ": FAILED: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private void executeBridgeCommand(AgentContracts.AgentCommand command,
+                                      TestAction action, String successMessage) {
+        AgentContracts.AgentResult result;
+        if (!MyAiAccessibilityService.isConnected()) {
+            result = new AgentContracts.AgentResult(
+                    command.requestId(), command.action(), false, "Control Bridge not connected");
+            appendChat("MyAI: Control Bridge не подключен.");
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
+            return;
+        }
+        try {
+            boolean ok = action.run();
+            String message = ok ? successMessage : "Команда не выполнена.";
+            result = new AgentContracts.AgentResult(
+                    command.requestId(), command.action(), ok, message);
+            appendChat(ok ? successMessage : "MyAI: команда не выполнена.");
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
+        } catch (Exception e) {
+            result = new AgentContracts.AgentResult(
+                    command.requestId(), command.action(), false, e.getClass().getSimpleName());
+            appendChat("MyAI: ошибка выполнения команды.");
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
         }
     }
 
