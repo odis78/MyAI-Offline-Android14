@@ -4,12 +4,14 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp">
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="MyAI — Инфиникс"
         android:textSize="24sp"
         android:textStyle="bold" />
+
     <TextView
         android:id="@+id/statusText"
         android:layout_width="match_parent"
@@ -38,7 +40,7 @@
         android:id="@+id/commandInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Например: Открой YouTube"
+        android:hint="Например: Пожалуйста, открой YouTube"
         android:inputType="text"
         android:singleLine="true" />
 
@@ -49,25 +51,35 @@
         android:text="Отправить команду" />
 
     <Button
+        android:id="@+id/chatgptButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Открыть ChatGPT" />
+
+    <Button
         android:id="@+id/openAccessibilityButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Открыть специальные возможности" />
+
     <Button
         android:id="@+id/homeButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Тест: Домой" />
+
     <Button
         android:id="@+id/backButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Тест: Назад" />
+
     <Button
         android:id="@+id/scrollButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Тест: Прокрутка вниз" />
+
     <Button
         android:id="@+id/refreshButton"
         android:layout_width="match_parent"
