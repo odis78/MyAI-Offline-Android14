@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.openAccessibilityButton).setOnClickListener(
                 v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         findViewById(R.id.chatgptButton).setOnClickListener(v -> openChatGPT());
+        findViewById(R.id.gatewayButton).setOnClickListener(v -> startActivity(new Intent(this, GatewayActivity.class)));
         findViewById(R.id.homeButton).setOnClickListener(v -> testHome());
         findViewById(R.id.backButton).setOnClickListener(v -> testBack());
         findViewById(R.id.scrollButton).setOnClickListener(v -> testScroll());
