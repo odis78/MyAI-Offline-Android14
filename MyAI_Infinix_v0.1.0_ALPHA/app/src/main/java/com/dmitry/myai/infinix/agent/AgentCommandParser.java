@@ -1,7 +1,6 @@
 package com.dmitry.myai.infinix.agent;
 
 import com.dmitry.myai.infinix.CommandParser;
-import org.json.JSONObject;
 
 import java.util.Locale;
 import java.util.UUID;
