@@ -15,7 +15,7 @@ public final class AgentResultCodec {
             o.put("message", result.message());
             return o.toString();
         } catch (Exception e) {
-            return "{"type":"tool_result","success":false,"message":"encoding_error"}";
+            return "{\"type\":\"tool_result\",\"success\":false,\"message\":\"encoding_error\"}";
         }
     }
 }
