@@ -29,7 +29,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
     @Override
     public void send(String sessionId, String userText, Callback callback) {
         try {
-            postJson(buildRequest(sessionId, userText), callback, true);
+            postJson(buildRequest(sessionId, userText), callback);
         } catch (Exception e) {
             callback.onFailure("request build failed: " + safeMessage(e.getMessage()));
         }
@@ -46,7 +46,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
             request.put("session_id", sessionId == null ? "default" : sessionId);
             request.put("type", "tool_result");
             request.put("tool_result", result);
-            postJson(request, callback, false);
+            postJson(request, callback);
         } catch (Exception e) {
             callback.onFailure("invalid tool result: " + e.getClass().getSimpleName());
         }
@@ -59,7 +59,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
         return request;
     }
 
-    private void postJson(JSONObject request, Callback callback, boolean expectAssistantResponse) {
+    private void postJson(JSONObject request, Callback callback) {
         if (!isAvailable()) {
             callback.onFailure("AI Gateway is not configured");
             return;
@@ -92,7 +92,7 @@ public final class HttpOnlineGateway implements OnlineGateway {
                     return;
                 }
 
-                if (!expectAssistantResponse) {
+                if (response.isBlank()) {
                     callback.onSuccess("", "");
                     return;
                 }
