@@ -12,9 +12,10 @@ test -f app/src/main/res/layout/activity_main.xml
 test -f app/src/main/res/values/strings.xml
 test -f app/src/main/res/values/styles.xml
 test -f app/src/main/res/xml/accessibility_service_config.xml
+test -f app/src/main/res/xml/data_extraction_rules.xml
 test -f app/src/main/res/drawable/ic_launcher_foreground.xml
-test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+test -f app/src/main/res/mipmap-anydpi/ic_launcher.xml
+test -f app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
 test -f app/src/main/res/values/colors.xml
 
 python3 - <<'PY'
@@ -51,6 +52,7 @@ for p in [
     r / "app/src/main/res/values/strings.xml",
     r / "app/src/main/res/values/styles.xml",
     r / "app/src/main/res/xml/accessibility_service_config.xml",
+    r / "app/src/main/res/xml/data_extraction_rules.xml",
 ]:
     ET.parse(p)
 
@@ -63,6 +65,8 @@ if 'android:icon="@mipmap/ic_launcher"' not in manifest:
     raise SystemExit("Manifest missing launcher icon")
 if 'android:roundIcon="@mipmap/ic_launcher_round"' not in manifest:
     raise SystemExit("Manifest missing round launcher icon")
+if 'android:dataExtractionRules="@xml/data_extraction_rules"' not in manifest:
+    raise SystemExit("Manifest missing data extraction rules")
 if 'android:exported="false"' not in manifest or 'android:name=".GatewayActivity"' not in manifest:
     raise SystemExit("GatewayActivity must remain non-exported")
 if 'android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"' not in manifest:
@@ -134,9 +138,9 @@ if "typeViewTextChanged" in accessibility_config:
     raise SystemExit("Accessibility config contains unnecessary typeViewTextChanged event")
 
 for view_id in [
-    "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "gatewayButton",
+    "statusText", "chatText", "mainScroll", "commandInput", "sendCommandButton", "gatewayButton",
     "chatgptButton", "logText", "openAccessibilityButton", "homeButton",
-    "backButton", "scrollButton", "refreshButton", "logScroll"
+    "backButton", "scrollButton", "refreshButton", "logText"
 ]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
@@ -152,5 +156,9 @@ for bad in ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "pl
             if bad in p.read_text(encoding="utf-8", errors="ignore"):
                 raise SystemExit(f"Suspicious typo '{bad}' found in {p.relative_to(r)}")
 
+if layout.count("<ScrollView") != 1:
+    raise SystemExit("Main layout must contain exactly one ScrollView")
+if gateway_layout.count("<ScrollView") != 1:
+    raise SystemExit("Gateway layout must contain exactly one ScrollView")
 print("STATIC SANITY: PASS")
 PY
