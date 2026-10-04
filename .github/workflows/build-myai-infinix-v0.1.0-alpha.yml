@@ -137,7 +137,8 @@ jobs:
           echo "${BADGING}" | grep -Fq "versionName='0.1.${GITHUB_RUN_NUMBER}-INFINIX-ALPHA'"
           SIGNING="$( "$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner" verify --verbose --print-certs "${APK}" )"
           EXPECTED_CERT_NORMALIZED="$(printf '%s' "${EXPECTED_CERT_SHA256}" | tr '[:upper:]' '[:lower:]')"
-          ACTUAL_CERT_NORMALIZED="$(printf '%s\\n' "${SIGNING}" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_CERT_NORMALIZED="$(echo "${SIGNING}" | grep -iF 'Signer #1 certificate SHA-256 digest:' | head -n 1 | sed 's/.*digest: //' | tr -d '\\r' | tr '[:upper:]' '[:lower:]')"
+          echo "APK certificate SHA-256: ${ACTUAL_CERT_NORMALIZED}"
           test -n "${ACTUAL_CERT_NORMALIZED}"
           test "${ACTUAL_CERT_NORMALIZED}" = "${EXPECTED_CERT_NORMALIZED}"
           if echo "${SIGNING}" | grep -Fq "CN=Android Debug"; then
