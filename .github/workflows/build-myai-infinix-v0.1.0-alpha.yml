@@ -13,7 +13,7 @@ env:
   PROJECT_DIR: MyAI_Infinix_v0.1.0_ALPHA
   APK: MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/release/app-release.apk
   BUILD_TOOLS: 35.0.0
-  EXPECTED_CERT_SHA256: FD:5D:81:CA:CB:DB:A2:5E:96:C6:E6:1B:CE:5A:C4:0C:BD:68:0B:E6:85:19:26:64:19:45:3B:CA:C5:9C:B9:06
+  EXPECTED_CERT_SHA256: 19:E7:DD:5A:EB:7A:23:52:69:B8:F6:F4:33:F6:8F:1B:E0:F3:C3:BC:1B:14:5B:C2:1F:DB:A5:26:EB:1E:CB:64
 
 jobs:
   build:
@@ -108,6 +108,10 @@ jobs:
           echo "MYAI_KEY_ALIAS=${MYAI_KEY_ALIAS}" >> "$GITHUB_ENV"
           echo "MYAI_KEY_PASSWORD=${MYAI_KEY_PASSWORD}" >> "$GITHUB_ENV"
           chmod 600 "${RUNNER_TEMP}/myai-signing/myai-infinix-release.jks"
+          keytool -list -v -keystore "${MYAI_KEYSTORE_PATH}" -storepass "${MYAI_KEYSTORE_PASSWORD}" -alias "${MYAI_KEY_ALIAS}" > "${RUNNER_TEMP}/myai-signing/keystore-details.txt"
+          grep -Fq "Entry type: PrivateKeyEntry" "${RUNNER_TEMP}/myai-signing/keystore-details.txt"
+          grep -Fq "19:E7:DD:5A:EB:7A:23:52:69:B8:F6:F4:33:F6:8F:1B:E0:F3:C3:BC:1B:14:5B:C2:1F:DB:A5:26:EB:1E:CB:64" "${RUNNER_TEMP}/myai-signing/keystore-details.txt"
+          echo "Permanent signing keystore and certificate verified."
 
       - name: Gradle test
         working-directory: ${{ env.PROJECT_DIR }}
