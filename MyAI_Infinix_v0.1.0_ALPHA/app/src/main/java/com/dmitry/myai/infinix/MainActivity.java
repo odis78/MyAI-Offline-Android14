@@ -17,6 +17,10 @@ import java.util.Locale;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
+import com.dmitry.myai.infinix.agent.AgentCommandParser;
+import com.dmitry.myai.infinix.agent.AgentContracts;
+import com.dmitry.myai.infinix.agent.AgentResultCodec;
+
 public class MainActivity extends Activity {
     private static final String CHATGPT_PACKAGE = "com.openai.chatgpt";
 
@@ -87,17 +91,17 @@ public class MainActivity extends Activity {
         switch (command.action()) {
             case HOME -> {
                 append("AGENT TOOL: HOME requestId=" + command.requestId());
-                executeBridgeCommand(command, MyAiAccessibilityService::home,
+                executeAgentBridgeCommand(command, MyAiAccessibilityService::home,
                         "Готово: открыл рабочий стол.");
             }
             case BACK -> {
                 append("AGENT TOOL: BACK requestId=" + command.requestId());
-                executeBridgeCommand(command, MyAiAccessibilityService::back,
+                executeAgentBridgeCommand(command, MyAiAccessibilityService::back,
                         "Готово: выполнил команду «Назад».");
             }
             case SCROLL_DOWN -> {
                 append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
-                executeBridgeCommand(command, MyAiAccessibilityService::scrollDown,
+                executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollDown,
                         "Готово: прокрутил экран вниз.");
             }
             case OPEN_APP -> {
@@ -312,7 +316,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void executeBridgeCommand(AgentContracts.AgentCommand command,
+    private void executeAgentBridgeCommand(AgentContracts.AgentCommand command,
                                       TestAction action, String successMessage) {
         AgentContracts.AgentResult result;
         if (!MyAiAccessibilityService.isConnected()) {
