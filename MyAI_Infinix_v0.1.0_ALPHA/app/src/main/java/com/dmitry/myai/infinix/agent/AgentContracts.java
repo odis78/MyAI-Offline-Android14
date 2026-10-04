@@ -1,0 +1,1 @@
+package com.dmitry.myai.infinix.agent; public final class AgentContracts { private AgentContracts(){} public enum Mode{OFFLINE,ONLINE,AUTO} public record AgentCommand(String name,String payload,boolean requiresConfirmation){} }
