@@ -41,7 +41,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set +e
           yes | sdkmanager --licenses
+          SDKMANAGER_RC=${PIPESTATUS[1]}
+          set -e
+          test "${SDKMANAGER_RC}" -eq 0
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Verify Android SDK
         shell: bash
