@@ -124,7 +124,6 @@ public class MyAiAccessibilityService extends AccessibilityService {
         if (instance == null) return null;
         try {
             List<android.view.accessibility.AccessibilityWindowInfo> windows = instance.getWindows();
-            AccessibilityNodeInfo fallback = instance.getRootInActiveWindow();
             if (windows != null) {
                 for (android.view.accessibility.AccessibilityWindowInfo window : windows) {
                     if (window == null) continue;
@@ -133,10 +132,9 @@ public class MyAiAccessibilityService extends AccessibilityService {
                     CharSequence pkg = root.getPackageName();
                     if (pkg != null && MYAI_PACKAGE.contentEquals(pkg)) continue;
                     if (performScrollProbe(root)) return root;
-                    if (fallback == null) fallback = root;
                 }
             }
-            return fallback;
+            return null;
         } catch (Exception e) {
             log("WINDOW TARGET error=" + e.getClass().getSimpleName());
             return null;
