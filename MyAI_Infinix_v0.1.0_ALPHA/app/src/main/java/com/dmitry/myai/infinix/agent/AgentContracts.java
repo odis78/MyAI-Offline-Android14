@@ -10,6 +10,7 @@ public final class AgentContracts {
         HOME,
         BACK,
         SCROLL_DOWN,
+        READ_SCREEN,
         OPEN_APP,
         OPEN_SETTINGS
     }
