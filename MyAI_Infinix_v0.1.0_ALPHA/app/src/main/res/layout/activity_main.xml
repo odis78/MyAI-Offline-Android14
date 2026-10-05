@@ -11,12 +11,29 @@
         android:padding="16dp">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/main_title" android:textSize="24sp" android:textStyle="bold" />
-        <TextView android:id="@+id/statusText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:paddingTop="8dp" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical"
+            android:fadingEdge="vertical"
+            android:background="#11000000">
+            <TextView android:id="@+id/statusText" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:padding="8dp" />
+        </ScrollView>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="8dp" android:text="@string/chat_title" android:textStyle="bold" />
-        <TextView android:id="@+id/chatText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="150dp" android:textSize="14sp" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical"
+            android:fadingEdge="vertical"
+            android:background="#08000000">
+            <TextView android:id="@+id/chatText" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="150dp" android:textSize="14sp"
+                android:padding="8dp" />
+        </ScrollView>
         <EditText android:id="@+id/commandInput" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:hint="@string/command_hint"
             android:importantForAutofill="no" android:inputType="text" android:singleLine="true" />
@@ -38,7 +55,16 @@
             android:layout_height="wrap_content" android:text="@string/refresh_status" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="8dp" android:text="@string/journal" android:textStyle="bold" />
-        <TextView android:id="@+id/logText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="13sp" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical"
+            android:fadingEdge="vertical"
+            android:background="#08000000">
+            <TextView android:id="@+id/logText" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="13sp"
+                android:padding="8dp" />
+        </ScrollView>
     </LinearLayout>
 </ScrollView>

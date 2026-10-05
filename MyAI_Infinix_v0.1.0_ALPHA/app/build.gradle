@@ -3,8 +3,8 @@ plugins {
 }
 
 dependencies {
+    implementation 'org.json:json:20240303'
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.json:json:20240303'
 }
 
 def ciRunNumber = System.getenv('GITHUB_RUN_NUMBER')

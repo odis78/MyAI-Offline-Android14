@@ -12,6 +12,7 @@ import java.util.List;
 
 public class MyAiAccessibilityService extends AccessibilityService {
     private static MyAiAccessibilityService instance;
+    private static final String MYAI_PACKAGE = "com.dmitry.myai.infinix";
 
     public static boolean isConnected() {
         return instance != null;
@@ -59,22 +60,95 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return ok;
     }
 
+    public static String readScreenText() {
+        if (instance == null) {
+            throw new IllegalStateException("Control Bridge not connected");
+        }
+        AccessibilityNodeInfo root = findBestTargetRoot(false);
+        if (root == null) return "";
+        StringBuilder out = new StringBuilder();
+        appendNodeText(root, out);
+        String text = out.toString().trim();
+        log("READ_SCREEN chars=" + text.length());
+        return text;
+    }
+
+    private static void appendNodeText(AccessibilityNodeInfo node, StringBuilder out) {
+        if (node == null) return;
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+        if (text != null && text.length() > 0) appendUniqueLine(out, text.toString());
+        if (desc != null && desc.length() > 0) appendUniqueLine(out, desc.toString());
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) appendNodeText(child, out);
+        }
+    }
+
+    private static void appendUniqueLine(StringBuilder out, String value) {
+        String line = value.replaceAll("\\s+", " ").trim();
+        if (line.isEmpty()) return;
+        if (out.length() == 0) {
+            out.append(line);
+            return;
+        }
+        String[] lines = out.toString().split("\\n");
+        for (String existing : lines) {
+            if (existing.equals(line)) return;
+        }
+        out.append("\n").append(line);
+    }
+
     public static boolean scrollDown() {
         if (instance == null) {
             throw new IllegalStateException("Control Bridge not connected");
         }
 
-        AccessibilityNodeInfo root = instance.getRootInActiveWindow();
-        if (root != null) {
-            if (performScrollOnTree(root)) {
-                log("SCROLL node-action=success");
-                return true;
-            }
+        AccessibilityNodeInfo root = findBestTargetRoot(true);
+        if (root != null && performScrollOnTree(root)) {
+            log("SCROLL node-action=success");
+            return true;
+        }
+
+        if (root == null) {
+            log("SCROLL no-target-window");
+            return false;
         }
 
         boolean dispatched = instance.dispatchSwipeGesture();
         log("SCROLL gesture-dispatched=" + dispatched);
         return dispatched;
+    }
+
+    private static AccessibilityNodeInfo findBestTargetRoot(boolean requireScrollable) {
+        if (instance == null) return null;
+        try {
+            List<android.view.accessibility.AccessibilityWindowInfo> windows = instance.getWindows();
+            if (windows != null) {
+                for (android.view.accessibility.AccessibilityWindowInfo window : windows) {
+                    if (window == null) continue;
+                    AccessibilityNodeInfo root = window.getRoot();
+                    if (root == null) continue;
+                    CharSequence pkg = root.getPackageName();
+                    if (pkg != null && MYAI_PACKAGE.contentEquals(pkg)) continue;
+                    if (!requireScrollable || performScrollProbe(root)) return root;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log("WINDOW TARGET error=" + e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private static boolean performScrollProbe(AccessibilityNodeInfo node) {
+        if (node == null) return false;
+        if (node.isScrollable()) return true;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null && performScrollProbe(child)) return true;
+        }
+        return false;
     }
 
     private static boolean performScrollOnTree(AccessibilityNodeInfo node) {

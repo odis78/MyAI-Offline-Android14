@@ -20,6 +20,9 @@ public final class AgentCommandParser {
         if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад")) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.BACK, "", false);
         }
+        if (CommandParser.containsAny(command, "прочитай экран", "прочитать экран", "считать экран", "что на экране", "прочти экран")) {
+            return new AgentContracts.AgentCommand(id, AgentContracts.Action.READ_SCREEN, "", false);
+        }
         if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.SCROLL_DOWN, "", false);
         }
@@ -61,6 +64,8 @@ public final class AgentCommandParser {
                         requestId, AgentContracts.Action.BACK, "", false);
                 case "scroll_down" -> new AgentContracts.AgentCommand(
                         requestId, AgentContracts.Action.SCROLL_DOWN, "", false);
+                case "read_screen", "get_screen_state" -> new AgentContracts.AgentCommand(
+                        requestId, AgentContracts.Action.READ_SCREEN, "", false);
                 case "open_settings" -> new AgentContracts.AgentCommand(
                         requestId, AgentContracts.Action.OPEN_SETTINGS, "", false);
                 case "open_app" -> {
