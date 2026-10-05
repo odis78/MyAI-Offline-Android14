@@ -99,15 +99,11 @@ public class MainActivity extends Activity {
             }
             case BACK -> {
                 append("AGENT TOOL: BACK requestId=" + command.requestId());
-                hideKeyboard();
-                executeAgentBridgeCommand(command, MyAiAccessibilityService::back,
-                        "Готово: выполнил системный Back.");
+                testBackForAgent(command);
             }
             case SCROLL_DOWN -> {
                 append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
-                hideKeyboard();
-                executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollDown,
-                        "Готово: прокрутил целевой экран вниз.");
+                testScrollForAgent(command);
             }
             case READ_SCREEN -> {
                 append("AGENT TOOL: READ_SCREEN requestId=" + command.requestId());
@@ -389,17 +385,57 @@ public class MainActivity extends Activity {
     }
 
     private void testBack() {
-        append("BACK test: current foreground");
+        append("BACK test: opening Android Settings...");
         hideKeyboard();
-        executeBridgeCommand("BACK TEST", MyAiAccessibilityService::back,
-                "Готово: системный Back выполнен.");
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> executeBridgeCommand("BACK TEST",
+                    MyAiAccessibilityService::back,
+                    "Готово: тест Back выполнен."), 1200);
+        } catch (Exception e) {
+            append("BACK TEST: FAILED opening Settings: " + e.getClass().getSimpleName());
+        }
     }
 
     private void testScroll() {
-        append("SCROLL test: target accessibility window");
+        append("SCROLL test: opening Android Settings...");
         hideKeyboard();
-        executeBridgeCommand("SCROLL TEST", MyAiAccessibilityService::scrollDown,
-                "Готово: прокрутка целевого экрана выполнена.");
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> executeBridgeCommand("SCROLL TEST",
+                    MyAiAccessibilityService::scrollDown,
+                    "Готово: тест прокрутки выполнен."), 1200);
+        } catch (Exception e) {
+            append("SCROLL TEST: FAILED opening Settings: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private void testBackForAgent(AgentContracts.AgentCommand command) {
+        append("AGENT BACK: opening Android Settings...");
+        hideKeyboard();
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> executeAgentBridgeCommand(command,
+                    MyAiAccessibilityService::back,
+                    "Готово: выполнил «Назад»."), 1200);
+        } catch (Exception e) {
+            append("AGENT BACK: FAILED opening Settings: " + e.getClass().getSimpleName());
+            appendChat("MyAI: команда «Назад» не выполнена.");
+        }
+    }
+
+    private void testScrollForAgent(AgentContracts.AgentCommand command) {
+        append("AGENT SCROLL: opening Android Settings...");
+        hideKeyboard();
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+            handler.postDelayed(() -> executeAgentBridgeCommand(command,
+                    MyAiAccessibilityService::scrollDown,
+                    "Готово: прокрутил экран вниз."), 1200);
+        } catch (Exception e) {
+            append("AGENT SCROLL: FAILED opening Settings: " + e.getClass().getSimpleName());
+            appendChat("MyAI: команда «Прокрути вниз» не выполнена.");
+        }
     }
 
     private void refresh() {
