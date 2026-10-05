@@ -97,7 +97,7 @@ gateway_layout = (r / "app/src/main/res/layout/activity_gateway.xml").read_text(
 
 for marker in [
     "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
-    "ACTION_SETTINGS", "postDelayed", "submitCommand", "executeBridgeCommand",
+    "ACTION_SETTINGS", "submitCommand", "executeBridgeCommand",
     "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec"
 ]:
     if marker not in main:
@@ -138,8 +138,8 @@ if "typeViewTextChanged" in accessibility_config:
     raise SystemExit("Accessibility config contains unnecessary typeViewTextChanged event")
 
 for view_id in [
-    "statusText", "chatText", "mainScroll", "commandInput", "sendCommandButton", "gatewayButton",
-    "chatgptButton", "logText", "openAccessibilityButton", "homeButton",
+    "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "gatewayButton",
+    "chatgptButton", "logText", "logScroll", "openAccessibilityButton", "homeButton",
     "backButton", "scrollButton", "refreshButton", "logText"
 ]:
     if view_id not in layout:
@@ -156,8 +156,8 @@ for bad in ["ALP HA", "My AI_Infinix", "bui ld", "setup -java", "licen ses", "pl
             if bad in p.read_text(encoding="utf-8", errors="ignore"):
                 raise SystemExit(f"Suspicious typo '{bad}' found in {p.relative_to(r)}")
 
-if layout.count("<ScrollView") != 1:
-    raise SystemExit("Main layout must contain exactly one ScrollView")
+if layout.count("<ScrollView") != 2:
+    raise SystemExit("Main layout must contain exactly two ScrollViews: chat + journal")
 if gateway_layout.count("<ScrollView") != 1:
     raise SystemExit("Gateway layout must contain exactly one ScrollView")
 print("STATIC SANITY: PASS")
