@@ -181,6 +181,26 @@ public class MainActivity extends Activity {
             openExternalIntent(intent, "OPEN_GALLERY", "Готово: открыл галерею.");
             return;
         }
+        if (matchesApp(normalized, "контакты", "контакт", "телефонная книга", "contacts")) {
+            Intent contacts = new Intent(Intent.ACTION_VIEW,
+                    android.provider.ContactsContract.Contacts.CONTENT_URI);
+            if (contacts.resolveActivity(getPackageManager()) != null) {
+                openExternalIntent(contacts, "OPEN_CONTACTS", "Готово: открыл контакты.");
+                return;
+            }
+            Intent packageIntent = getPackageManager().getLaunchIntentForPackage("com.android.contacts");
+            if (packageIntent == null) {
+                packageIntent = getPackageManager().getLaunchIntentForPackage("com.google.android.contacts");
+            }
+            if (packageIntent == null) packageIntent = findLaunchIntentByName("contacts");
+            if (packageIntent != null) {
+                openExternalIntent(packageIntent, "OPEN_CONTACTS", "Готово: открыл контакты.");
+            } else {
+                appendChat("MyAI: приложение контактов не найдено.");
+                append("OPEN_CONTACTS: FAILED (APP NOT FOUND)");
+            }
+            return;
+        }
         if (matchesApp(normalized, "настройки", "settings")) {
             openExternalIntent(new Intent(Settings.ACTION_SETTINGS), "OPEN_SETTINGS",
                     "Готово: открыл настройки Android.");
