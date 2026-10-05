@@ -3,6 +3,7 @@ package com.dmitry.myai.infinix.bridge;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -66,46 +67,58 @@ public class MyAiAccessibilityService extends AccessibilityService {
 
         AccessibilityNodeInfo root = instance.getRootInActiveWindow();
         if (root != null) {
-            if (performScrollOnTree(root)) {
+            AccessibilityNodeInfo target = findBestScrollableNode(root);
+            if (target != null &&
+                    target.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
                 log("SCROLL node-action=success");
                 return true;
             }
         }
 
         boolean dispatched = instance.dispatchSwipeGesture();
-        log("SCROLL gesture-dispatched=" + dispatched);
+        log("SCROLL gesture-fallback dispatched=" + dispatched);
         return dispatched;
     }
 
-    private static boolean performScrollOnTree(AccessibilityNodeInfo node) {
-        if (node.isScrollable() &&
-                node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
-            return true;
+    private static AccessibilityNodeInfo findBestScrollableNode(AccessibilityNodeInfo root) {
+        WindowManager wm = (WindowManager) instance.getSystemService(WINDOW_SERVICE);
+        if (wm == null) return null;
+
+        DisplayMetrics dm = new DisplayMetrics();
+        wm.getDefaultDisplay().getRealMetrics(dm);
+        return findScrollable(root, dm.widthPixels / 2, dm.heightPixels / 2);
+    }
+
+    private static AccessibilityNodeInfo findScrollable(
+            AccessibilityNodeInfo node, int centerX, int centerY) {
+        AccessibilityNodeInfo best = null;
+        long bestArea = Long.MAX_VALUE;
+
+        if (node.isScrollable()) {
+            Rect bounds = new Rect();
+            node.getBoundsInScreen(bounds);
+            if (!bounds.isEmpty() && bounds.contains(centerX, centerY)) {
+                best = node;
+                bestArea = (long) bounds.width() * bounds.height();
+            }
         }
 
-        List<AccessibilityNodeInfo> children = node.getChildCount() > 0
-                ? getChildren(node)
-                : null;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
 
-        if (children != null) {
-            for (AccessibilityNodeInfo child : children) {
-                if (child != null && performScrollOnTree(child)) {
-                    return true;
+            AccessibilityNodeInfo candidate = findScrollable(child, centerX, centerY);
+            if (candidate != null) {
+                Rect bounds = new Rect();
+                candidate.getBoundsInScreen(bounds);
+                long area = (long) bounds.width() * bounds.height();
+                if (best == null || area < bestArea) {
+                    best = candidate;
+                    bestArea = area;
                 }
             }
         }
-        return false;
-    }
-
-    private static List<AccessibilityNodeInfo> getChildren(AccessibilityNodeInfo node) {
-        java.util.ArrayList<AccessibilityNodeInfo> result = new java.util.ArrayList<>();
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                result.add(child);
-            }
-        }
-        return result;
+        return best;
     }
 
     private boolean dispatchSwipeGesture() {
