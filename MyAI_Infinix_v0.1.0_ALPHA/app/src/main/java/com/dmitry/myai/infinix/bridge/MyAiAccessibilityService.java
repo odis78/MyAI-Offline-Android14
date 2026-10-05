@@ -64,7 +64,7 @@ public class MyAiAccessibilityService extends AccessibilityService {
         if (instance == null) {
             throw new IllegalStateException("Control Bridge not connected");
         }
-        AccessibilityNodeInfo root = findBestTargetRoot();
+        AccessibilityNodeInfo root = findBestTargetRoot(false);
         if (root == null) return "";
         StringBuilder out = new StringBuilder();
         appendNodeText(root, out);
@@ -104,7 +104,7 @@ public class MyAiAccessibilityService extends AccessibilityService {
             throw new IllegalStateException("Control Bridge not connected");
         }
 
-        AccessibilityNodeInfo root = findBestTargetRoot();
+        AccessibilityNodeInfo root = findBestTargetRoot(true);
         if (root != null && performScrollOnTree(root)) {
             log("SCROLL node-action=success");
             return true;
@@ -120,7 +120,7 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return dispatched;
     }
 
-    private static AccessibilityNodeInfo findBestTargetRoot() {
+    private static AccessibilityNodeInfo findBestTargetRoot(boolean requireScrollable) {
         if (instance == null) return null;
         try {
             List<android.view.accessibility.AccessibilityWindowInfo> windows = instance.getWindows();
@@ -131,7 +131,7 @@ public class MyAiAccessibilityService extends AccessibilityService {
                     if (root == null) continue;
                     CharSequence pkg = root.getPackageName();
                     if (pkg != null && MYAI_PACKAGE.contentEquals(pkg)) continue;
-                    if (performScrollProbe(root)) return root;
+                    if (!requireScrollable || performScrollProbe(root)) return root;
                 }
             }
             return null;
