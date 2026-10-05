@@ -109,7 +109,7 @@ for marker in [
     if marker not in parser:
         raise SystemExit(f"CommandParser marker missing: {marker}")
 
-for marker in ["fromNaturalLanguage", "fromModelJson", "open_app", "tool_call"]:
+for marker in ["fromNaturalLanguage", "fromModelJson", "open_app", "tool_call", "верни", "back", "скролл вниз", "scroll down"]:
     if marker not in agent_parser:
         raise SystemExit(f"AgentCommandParser marker missing: {marker}")
 
@@ -127,13 +127,20 @@ for forbidden in ["sk-", "OPENAI_API_KEY", "Authorization: Bearer", "api_key"]:
 
 for marker in [
     "GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction",
-    "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "dispatchGesture",
-    "GestureResultCallback", "getRealMetrics"
+    "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "ACTION_SCROLL_BACKWARD",
+    "dispatchGesture", "dispatchBackSwipe", "GestureResultCallback", "getRealMetrics",
+    "bestArea = 0", "area > bestArea", "root.recycle()"
 ]:
     if marker not in bridge:
         raise SystemExit(f"Accessibility marker missing: {marker}")
 
 accessibility_config = (r / "app/src/main/res/xml/accessibility_service_config.xml").read_text(encoding="utf-8")
+for marker in [
+    "typeViewScrolled", 'notificationTimeout="100"',
+    "flagDefault", "flagRetrieveInteractiveWindows", "flagReportViewIds"
+]:
+    if marker not in accessibility_config:
+        raise SystemExit(f"Accessibility config marker missing: {marker}")
 if "typeViewTextChanged" in accessibility_config:
     raise SystemExit("Accessibility config contains unnecessary typeViewTextChanged event")
 
