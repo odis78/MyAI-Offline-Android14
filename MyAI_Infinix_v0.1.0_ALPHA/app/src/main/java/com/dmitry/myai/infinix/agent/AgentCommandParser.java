@@ -17,10 +17,10 @@ public final class AgentCommandParser {
         if (CommandParser.containsAny(command, "домой", "на главный экран", "рабочий стол")) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.HOME, "", false);
         }
-        if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад")) {
+        if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад", "верни", "back")) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.BACK, "", false);
         }
-        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "вниз")) {
+        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "скролл вниз", "scroll down", "scroll_down", "вниз")) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.SCROLL_DOWN, "", false);
         }
         if (CommandParser.containsAny(command, "настройки", "открой настройки")) {
