@@ -55,7 +55,16 @@
             android:layout_height="wrap_content" android:text="@string/refresh_status" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="8dp" android:text="@string/journal" android:textStyle="bold" />
-        <TextView android:id="@+id/logText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="13sp" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical"
+            android:fadingEdge="vertical"
+            android:background="#08000000">
+            <TextView android:id="@+id/logText" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="13sp"
+                android:padding="8dp" />
+        </ScrollView>
     </LinearLayout>
 </ScrollView>
