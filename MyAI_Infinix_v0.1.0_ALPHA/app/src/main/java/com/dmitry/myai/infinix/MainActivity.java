@@ -427,7 +427,8 @@ public class MainActivity extends Activity {
         String status = MyAiAccessibilityService.isConnected()
                 ? "Control Bridge: ПОДКЛЮЧЕН"
                 : "Control Bridge: НЕ ПОДКЛЮЧЕН";
-        statusText.setText(status);
+        statusText.setText(status + "\n\nДоступ Control Bridge: " +
+                (MyAiAccessibilityService.isConnected() ? "ВКЛ" : "ВЫКЛ"));
         if (!status.equals(lastStatus)) {
             append(status);
             lastStatus = status;
@@ -436,6 +437,10 @@ public class MainActivity extends Activity {
 
     private void appendChat(String message) {
         chatText.append(message + "\n");
+        chatText.post(() -> {
+            View parent = (View) chatText.getParent();
+            if (parent instanceof ScrollView) ((ScrollView) parent).fullScroll(View.FOCUS_DOWN);
+        });
     }
 
     private void append(String message) {
