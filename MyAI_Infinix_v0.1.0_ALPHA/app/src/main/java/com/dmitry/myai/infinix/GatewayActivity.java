@@ -152,6 +152,12 @@ public final class GatewayActivity extends Activity {
                             && MyAiAccessibilityService.scrollDown();
                     message = ok ? "Готово: прокрутил вниз." : "Control Bridge не выполнил Scroll.";
                 }
+                case READ_SCREEN -> {
+                    String screen = MyAiAccessibilityService.isConnected()
+                            ? MyAiAccessibilityService.readScreenText() : "";
+                    ok = screen != null && !screen.isBlank();
+                    message = ok ? screen : "На текущем экране текст не найден.";
+                }
                 case OPEN_SETTINGS -> {
                     Intent intent = new Intent(android.provider.Settings.ACTION_SETTINGS);
                     if (intent.resolveActivity(getPackageManager()) != null) {
@@ -292,14 +298,10 @@ public final class GatewayActivity extends Activity {
 
     private void appendChat(String value) {
         chat.append(value + "\n");
-        chat.post(() -> ((ScrollView) findViewById(R.id.gatewayRootScroll))
-                .fullScroll(View.FOCUS_DOWN));
     }
 
     private void append(String value) {
         log.append(value + "\n");
-        log.post(() -> ((ScrollView) findViewById(R.id.gatewayRootScroll))
-                .fullScroll(View.FOCUS_DOWN));
     }
 
     private boolean isCurrent(int generation) {
