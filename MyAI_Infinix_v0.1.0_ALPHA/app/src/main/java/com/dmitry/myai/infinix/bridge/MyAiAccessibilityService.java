@@ -95,7 +95,7 @@ public class MyAiAccessibilityService extends AccessibilityService {
         for (String existing : lines) {
             if (existing.equals(line)) return;
         }
-        out.append("\\n").append(line);
+        out.append("\n").append(line);
     }
 
     public static boolean scrollDown() {
