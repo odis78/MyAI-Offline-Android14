@@ -392,35 +392,19 @@ public class MainActivity extends Activity {
     }
 
     private void testBack() {
-        if (!MyAiAccessibilityService.isConnected()) {
-            append("ERROR: Control Bridge not connected");
-            return;
-        }
-        append("BACK test: opening Android Settings...");
-        try {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> executeBridgeCommand("BACK TEST",
-                    MyAiAccessibilityService::back,
-                    "Готово: тест Back выполнен."), 1200);
-        } catch (Exception e) {
-            append("ERROR opening Settings: " + e.getMessage());
-        }
+        append("BACK test: system Back");
+        hideKeyboard();
+        executeBridgeCommand("BACK TEST",
+                MyAiAccessibilityService::back,
+                "Готово: системный Back выполнен.");
     }
 
     private void testScroll() {
-        if (!MyAiAccessibilityService.isConnected()) {
-            append("ERROR: Control Bridge not connected");
-            return;
-        }
-        append("SCROLL test: opening Android Settings...");
-        try {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> executeBridgeCommand("SCROLL TEST",
-                    MyAiAccessibilityService::scrollDown,
-                    "Готово: тест прокрутки выполнен."), 1200);
-        } catch (Exception e) {
-            append("ERROR opening Settings: " + e.getMessage());
-        }
+        append("SCROLL test: system screen");
+        hideKeyboard();
+        executeBridgeCommand("SCROLL TEST",
+                MyAiAccessibilityService::scrollDown,
+                "Готово: прокрутка экрана выполнена.");
     }
 
     private void refresh() {
