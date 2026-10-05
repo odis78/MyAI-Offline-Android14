@@ -1,5 +1,6 @@
 name: Build MyAI Infinix — ChatGPT + Control Bridge + Agent FIXED
 # CI trigger: rebuild after static fixes
+# FIXED-14 UI scroll + Accessibility status validation
 # FIXED-5 validation build
 
 on:
