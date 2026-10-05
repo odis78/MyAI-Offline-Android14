@@ -6,6 +6,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -97,13 +101,20 @@ public class MainActivity extends Activity {
             }
             case BACK -> {
                 append("AGENT TOOL: BACK requestId=" + command.requestId());
-                executeAgentBridgeCommand(command, MyAiAccessibilityService::back,
-                        "Готово: выполнил команду «Назад».");
+                hideKeyboard();
+                handler.postDelayed(() -> executeAgentBridgeCommand(command,
+                        MyAiAccessibilityService::back,
+                        "Готово: выполнил команду «Назад»."), 250);
             }
             case SCROLL_DOWN -> {
                 append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
+                hideKeyboard();
                 executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollDown,
                         "Готово: прокрутил экран вниз.");
+            }
+            case READ_SCREEN -> {
+                append("AGENT TOOL: READ_SCREEN requestId=" + command.requestId());
+                readScreenForAgent(command);
             }
             case OPEN_APP -> {
                 append("AGENT TOOL: OPEN_APP payload=" + command.payload() +
@@ -342,6 +353,39 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void readScreenForAgent(AgentContracts.AgentCommand command) {
+        AgentContracts.AgentResult result;
+        if (!MyAiAccessibilityService.isConnected()) {
+            result = new AgentContracts.AgentResult(command.requestId(), command.action(), false,
+                    "Control Bridge not connected");
+            appendChat("MyAI: Control Bridge не подключен.");
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
+            return;
+        }
+        try {
+            String screen = MyAiAccessibilityService.readScreenText();
+            boolean ok = screen != null && !screen.isBlank();
+            String message = ok ? screen : "На текущем экране текст не найден.";
+            result = new AgentContracts.AgentResult(command.requestId(), command.action(), ok, message);
+            appendChat(ok ? "MyAI: Содержимое экрана:\\n" + screen : "MyAI: " + message);
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
+        } catch (Exception e) {
+            result = new AgentContracts.AgentResult(command.requestId(), command.action(), false,
+                    e.getClass().getSimpleName());
+            appendChat("MyAI: ошибка чтения экрана.");
+            append("AGENT RESULT: " + AgentResultCodec.toJson(result));
+        }
+    }
+
+    private void hideKeyboard() {
+        View focused = getCurrentFocus();
+        if (focused != null) {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+            focused.clearFocus();
+        }
+    }
+
     private void testHome() {
         executeBridgeCommand("HOME TEST", MyAiAccessibilityService::home,
                 "Готово: тест Home выполнен.");
@@ -392,14 +436,10 @@ public class MainActivity extends Activity {
 
     private void appendChat(String message) {
         chatText.append(message + "\n");
-        chatText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
-                .fullScroll(View.FOCUS_DOWN));
     }
 
     private void append(String message) {
         logText.append(message + "\n");
-        logText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
-                .fullScroll(View.FOCUS_DOWN));
     }
 
     @Override
