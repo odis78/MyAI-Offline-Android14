@@ -3,6 +3,8 @@
 
     <queries>
         <package android:name="com.openai.chatgpt"/>
+        <package android:name="com.android.contacts"/>
+        <package android:name="com.google.android.contacts"/>
         <intent>
             <action android:name="android.intent.action.MAIN"/>
             <category android:name="android.intent.category.LAUNCHER"/>
