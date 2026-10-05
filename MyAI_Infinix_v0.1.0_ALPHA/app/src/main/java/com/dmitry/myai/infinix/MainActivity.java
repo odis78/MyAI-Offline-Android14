@@ -102,15 +102,20 @@ public class MainActivity extends Activity {
             case BACK -> {
                 append("AGENT TOOL: BACK requestId=" + command.requestId());
                 hideKeyboard();
+                append("AGENT: перевод MyAI в фон перед системным Back");
+                moveTaskToBack(true);
                 handler.postDelayed(() -> executeAgentBridgeCommand(command,
                         MyAiAccessibilityService::back,
-                        "Готово: выполнил команду «Назад»."), 250);
+                        "Готово: выполнил системный Back в предыдущем приложении."), 350);
             }
             case SCROLL_DOWN -> {
                 append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
                 hideKeyboard();
-                executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollDown,
-                        "Готово: прокрутил экран вниз.");
+                append("AGENT: перевод MyAI в фон перед прокруткой");
+                moveTaskToBack(true);
+                handler.postDelayed(() -> executeAgentBridgeCommand(command,
+                        MyAiAccessibilityService::scrollDown,
+                        "Готово: прокрутил предыдущий экран вниз."), 350);
             }
             case READ_SCREEN -> {
                 append("AGENT TOOL: READ_SCREEN requestId=" + command.requestId());
@@ -392,19 +397,21 @@ public class MainActivity extends Activity {
     }
 
     private void testBack() {
-        append("BACK test: system Back");
+        append("BACK test: previous application");
         hideKeyboard();
-        executeBridgeCommand("BACK TEST",
+        moveTaskToBack(true);
+        handler.postDelayed(() -> executeBridgeCommand("BACK TEST",
                 MyAiAccessibilityService::back,
-                "Готово: системный Back выполнен.");
+                "Готово: системный Back выполнен."), 350);
     }
 
     private void testScroll() {
-        append("SCROLL test: system screen");
+        append("SCROLL test: previous application");
         hideKeyboard();
-        executeBridgeCommand("SCROLL TEST",
+        moveTaskToBack(true);
+        handler.postDelayed(() -> executeBridgeCommand("SCROLL TEST",
                 MyAiAccessibilityService::scrollDown,
-                "Готово: прокрутка экрана выполнена.");
+                "Готово: прокрутка предыдущего экрана выполнена."), 350);
     }
 
     private void refresh() {
