@@ -1,44 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/mainScroll"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
-    <LinearLayout
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <ScrollView
+        android:id="@+id/chatScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/main_title"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:text="@string/chat_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/chatText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="150dp"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/commandInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/command_hint"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/sendCommandButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/send_local" />
+
+            <Button
+                android:id="@+id/gatewayButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/gateway" />
+
+            <Button
+                android:id="@+id/chatgptButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/open_chatgpt" />
+
+            <Button
+                android:id="@+id/openAccessibilityButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/accessibility_settings" />
+
+            <Button
+                android:id="@+id/homeButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/test_home" />
+
+            <Button
+                android:id="@+id/backButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/test_back" />
+
+            <Button
+                android:id="@+id/scrollButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/test_scroll" />
+
+            <Button
+                android:id="@+id/refreshButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/refresh_status" />
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="@string/main_title" android:textSize="24sp" android:textStyle="bold" />
-        <TextView android:id="@+id/statusText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:paddingTop="8dp" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:paddingTop="8dp" android:text="@string/chat_title" android:textStyle="bold" />
-        <TextView android:id="@+id/chatText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="150dp" android:textSize="14sp" />
-        <EditText android:id="@+id/commandInput" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:hint="@string/command_hint"
-            android:importantForAutofill="no" android:inputType="text" android:singleLine="true" />
-        <Button android:id="@+id/sendCommandButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/send_local" />
-        <Button android:id="@+id/gatewayButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/gateway" />
-        <Button android:id="@+id/chatgptButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/open_chatgpt" />
-        <Button android:id="@+id/openAccessibilityButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/accessibility_settings" />
-        <Button android:id="@+id/homeButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/test_home" />
-        <Button android:id="@+id/backButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/test_back" />
-        <Button android:id="@+id/scrollButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/test_scroll" />
-        <Button android:id="@+id/refreshButton" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:text="@string/refresh_status" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:paddingTop="8dp" android:text="@string/journal" android:textStyle="bold" />
-        <TextView android:id="@+id/logText" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="280dp" android:textSize="13sp" />
-    </LinearLayout>
-</ScrollView>
+        android:paddingTop="8dp"
+        android:text="@string/journal"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:id="@+id/logScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/logText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="120dp"
+            android:textSize="13sp" />
+    </ScrollView>
+</LinearLayout>
