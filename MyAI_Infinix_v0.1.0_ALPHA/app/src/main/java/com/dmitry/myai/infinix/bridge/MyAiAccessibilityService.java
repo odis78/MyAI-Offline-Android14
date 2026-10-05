@@ -59,6 +59,45 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return ok;
     }
 
+    public static String readScreenText() {
+        if (instance == null) {
+            throw new IllegalStateException("Control Bridge not connected");
+        }
+        AccessibilityNodeInfo root = instance.getRootInActiveWindow();
+        if (root == null) return "";
+        StringBuilder out = new StringBuilder();
+        appendNodeText(root, out);
+        String text = out.toString().trim();
+        log("READ_SCREEN chars=" + text.length());
+        return text;
+    }
+
+    private static void appendNodeText(AccessibilityNodeInfo node, StringBuilder out) {
+        if (node == null) return;
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+        if (text != null && text.length() > 0) appendUniqueLine(out, text.toString());
+        if (desc != null && desc.length() > 0) appendUniqueLine(out, desc.toString());
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) appendNodeText(child, out);
+        }
+    }
+
+    private static void appendUniqueLine(StringBuilder out, String value) {
+        String line = value.replaceAll("\\s+", " ").trim();
+        if (line.isEmpty()) return;
+        if (out.length() == 0) {
+            out.append(line);
+            return;
+        }
+        String[] lines = out.toString().split("\\n");
+        for (String existing : lines) {
+            if (existing.equals(line)) return;
+        }
+        out.append("\\n").append(line);
+    }
+
     public static boolean scrollDown() {
         if (instance == null) {
             throw new IllegalStateException("Control Bridge not connected");
