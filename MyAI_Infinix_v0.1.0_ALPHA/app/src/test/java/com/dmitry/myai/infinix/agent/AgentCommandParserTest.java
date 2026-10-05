@@ -56,4 +56,25 @@ public class AgentCommandParserTest {
         assertTrue(json.contains("\"request_id\":\"abc\""));
         assertTrue(json.contains("\"success\":true"));
     }
+    @Test public void naturalBackAliases() {
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("верни").action());
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("back").action());
+    }
+
+    @Test public void naturalScrollAliases() {
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("скролл вниз").action());
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("scroll down").action());
+    }
+
+    @Test public void naturalContacts() {
+        AgentContracts.AgentCommand c =
+                AgentCommandParser.fromNaturalLanguage("открой контакты");
+        assertEquals(AgentContracts.Action.OPEN_APP, c.action());
+        assertEquals("контакты", c.payload());
+    }
+
 }
