@@ -3,7 +3,6 @@ package com.dmitry.myai.infinix;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.EditText;
@@ -28,7 +27,6 @@ public class MainActivity extends Activity {
     private TextView chatText;
     private TextView logText;
     private EditText commandInput;
-    private final Handler handler = new Handler();
     private String lastStatus = null;
 
     private interface TestAction { boolean run(); }
@@ -348,35 +346,13 @@ public class MainActivity extends Activity {
     }
 
     private void testBack() {
-        if (!MyAiAccessibilityService.isConnected()) {
-            append("ERROR: Control Bridge not connected");
-            return;
-        }
-        append("BACK test: opening Android Settings...");
-        try {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> executeBridgeCommand("BACK TEST",
-                    MyAiAccessibilityService::back,
-                    "Готово: тест Back выполнен."), 1200);
-        } catch (Exception e) {
-            append("ERROR opening Settings: " + e.getMessage());
-        }
+        executeBridgeCommand("BACK", MyAiAccessibilityService::back,
+                "Готово: выполнил «Назад».");
     }
 
     private void testScroll() {
-        if (!MyAiAccessibilityService.isConnected()) {
-            append("ERROR: Control Bridge not connected");
-            return;
-        }
-        append("SCROLL test: opening Android Settings...");
-        try {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-            handler.postDelayed(() -> executeBridgeCommand("SCROLL TEST",
-                    MyAiAccessibilityService::scrollDown,
-                    "Готово: тест прокрутки выполнен."), 1200);
-        } catch (Exception e) {
-            append("ERROR opening Settings: " + e.getMessage());
-        }
+        executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
+                "Готово: прокрутил экран вниз.");
     }
 
     private void refresh() {
@@ -392,14 +368,18 @@ public class MainActivity extends Activity {
 
     private void appendChat(String message) {
         chatText.append(message + "\n");
-        chatText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
-                .fullScroll(View.FOCUS_DOWN));
+        chatText.post(() -> {
+            ScrollView scroll = findViewById(R.id.chatScroll);
+            if (scroll != null) scroll.fullScroll(View.FOCUS_DOWN);
+        });
     }
 
     private void append(String message) {
         logText.append(message + "\n");
-        logText.post(() -> ((ScrollView) findViewById(R.id.mainScroll))
-                .fullScroll(View.FOCUS_DOWN));
+        logText.post(() -> {
+            ScrollView scroll = findViewById(R.id.logScroll);
+            if (scroll != null) scroll.fullScroll(View.FOCUS_DOWN);
+        });
     }
 
     @Override
@@ -410,7 +390,6 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 }
