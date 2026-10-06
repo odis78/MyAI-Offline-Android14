@@ -18,6 +18,42 @@ public class AgentCommandParserTest {
         assertEquals(AgentContracts.Action.HOME, c.action());
     }
 
+    @Test public void naturalBackAliases() {
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("верни").action());
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("вернись").action());
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("back").action());
+        assertEquals(AgentContracts.Action.BACK,
+                AgentCommandParser.fromNaturalLanguage("go back").action());
+    }
+
+    @Test public void naturalScrollAliases() {
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("скролл вниз").action());
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("scroll down").action());
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("прокрути журнал вниз").action());
+        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+                AgentCommandParser.fromNaturalLanguage("пролистай экран вниз").action());
+    }
+
+    @Test public void naturalContacts() {
+        AgentContracts.AgentCommand c =
+                AgentCommandParser.fromNaturalLanguage("открой контакты");
+        assertEquals(AgentContracts.Action.OPEN_APP, c.action());
+        assertEquals("контакты", c.payload());
+    }
+
+    @Test public void naturalAppWithFiller() {
+        AgentContracts.AgentCommand c =
+                AgentCommandParser.fromNaturalLanguage("открой мне контакты");
+        assertEquals(AgentContracts.Action.OPEN_APP, c.action());
+        assertEquals("контакты", c.payload());
+    }
+
     @Test public void modelOpenAppJson() {
         String json = "{\"type\":\"tool_call\",\"request_id\":\"42\",\"tool\":\"open_app\",\"arguments\":{\"name\":\"YouTube\"}}";
         AgentContracts.AgentCommand c = AgentCommandParser.fromModelJson(json);
@@ -56,25 +92,4 @@ public class AgentCommandParserTest {
         assertTrue(json.contains("\"request_id\":\"abc\""));
         assertTrue(json.contains("\"success\":true"));
     }
-    @Test public void naturalBackAliases() {
-        assertEquals(AgentContracts.Action.BACK,
-                AgentCommandParser.fromNaturalLanguage("верни").action());
-        assertEquals(AgentContracts.Action.BACK,
-                AgentCommandParser.fromNaturalLanguage("back").action());
-    }
-
-    @Test public void naturalScrollAliases() {
-        assertEquals(AgentContracts.Action.SCROLL_DOWN,
-                AgentCommandParser.fromNaturalLanguage("скролл вниз").action());
-        assertEquals(AgentContracts.Action.SCROLL_DOWN,
-                AgentCommandParser.fromNaturalLanguage("scroll down").action());
-    }
-
-    @Test public void naturalContacts() {
-        AgentContracts.AgentCommand c =
-                AgentCommandParser.fromNaturalLanguage("открой контакты");
-        assertEquals(AgentContracts.Action.OPEN_APP, c.action());
-        assertEquals("контакты", c.payload());
-    }
-
 }
