@@ -14,13 +14,13 @@ public final class AgentCommandParser {
         String command = CommandParser.normalize(raw);
         String id = UUID.randomUUID().toString();
 
-        if (CommandParser.containsAny(command, "домой", "на главный экран", "рабочий стол")) {
+        if (isHomeCommand(command)) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.HOME, "", false);
         }
-        if (CommandParser.containsAny(command, "назад", "вернись назад", "вернуться назад", "верни", "back")) {
+        if (isBackCommand(command)) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.BACK, "", false);
         }
-        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз", "пролистай вниз", "скролл вниз", "scroll down", "scroll_down", "вниз")) {
+        if (isScrollDownCommand(command)) {
             return new AgentContracts.AgentCommand(id, AgentContracts.Action.SCROLL_DOWN, "", false);
         }
         if (CommandParser.containsAny(command, "настройки", "открой настройки")) {
@@ -29,10 +29,40 @@ public final class AgentCommandParser {
 
         String app = CommandParser.extractApp(command);
         if (app != null) {
-            return new AgentContracts.AgentCommand(id, AgentContracts.Action.OPEN_APP, app, false);
+            return new AgentContracts.AgentCommand(id, AgentContracts.Action.OPEN_APP, cleanAppRequest(app), false);
         }
 
         return AgentContracts.AgentCommand.none(id);
+    }
+
+    private static boolean isHomeCommand(String command) {
+        return CommandParser.containsAny(command,
+                "домой", "на главный экран", "главный экран", "рабочий стол");
+    }
+
+    private static boolean isBackCommand(String command) {
+        return CommandParser.containsAny(command,
+                "назад", "вернись", "верни", "вернуться", "вернуться назад",
+                "вернись назад", "верни назад", "back", "go back");
+    }
+
+    private static boolean isScrollDownCommand(String command) {
+        if (CommandParser.containsAny(command, "прокрути вниз", "прокрутка вниз",
+                "пролистай вниз", "скролл вниз", "scroll down", "scroll_down")) {
+            return true;
+        }
+        boolean scrollVerb = CommandParser.containsAny(command,
+                "прокрути", "прокрутить", "прокрутка", "пролистай", "пролистать",
+                "скролл", "scroll");
+        boolean down = CommandParser.containsAny(command, "вниз", "down");
+        return scrollVerb && down;
+    }
+
+    private static String cleanAppRequest(String app) {
+        String value = app.trim();
+        if (value.startsWith("мне ")) value = value.substring(4).trim();
+        if (value.startsWith("пожалуйста ")) value = value.substring(11).trim();
+        return value;
     }
 
     public static AgentContracts.AgentCommand fromModelJson(String raw) {
