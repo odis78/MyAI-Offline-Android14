@@ -1,15 +1,21 @@
 package com.dmitry.myai.infinix.bridge;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityWindowInfo;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.view.WindowManager;
-import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import java.util.List;
+
 public class MyAiAccessibilityService extends AccessibilityService {
+    private static final String OWN_PACKAGE = "com.dmitry.myai.infinix";
+    private static final String CHAT_SCROLL_ID = OWN_PACKAGE + ":id/chatScroll";
+    private static final String LOG_SCROLL_ID = OWN_PACKAGE + ":id/logScroll";
+
     private static MyAiAccessibilityService instance;
 
     public static boolean isConnected() { return instance != null; }
@@ -19,8 +25,8 @@ public class MyAiAccessibilityService extends AccessibilityService {
         log("SERVICE CONNECTED — INFINIX ALPHA");
     }
 
-    @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Events are intentionally observed by the bridge; command execution is explicit.
+    @Override public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {
+        // Commands are explicit; events are used only to keep window content accessible.
     }
 
     @Override public void onInterrupt() { log("SERVICE INTERRUPTED"); }
@@ -49,38 +55,144 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return dispatched;
     }
 
+    /**
+     * Scroll the main content of the currently visible application.
+     * Never uses getRootInActiveWindow(), because with the keyboard open
+     * that can point at the IME window instead of the application.
+     */
     public static boolean scrollDown() {
         if (instance == null) throw new IllegalStateException("Control Bridge not connected");
 
-        AccessibilityNodeInfo root = instance.getRootInActiveWindow();
+        AccessibilityNodeInfo root = instance.findVisibleApplicationRoot();
         if (root != null) {
-            AccessibilityNodeInfo target = null;
             try {
-                target = findBestScrollableNode(root);
+                AccessibilityNodeInfo target = findBestScrollableNode(root);
                 if (target != null) {
-                    boolean forward = target.performAction(
-                            AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-                    if (forward) {
-                        log("SCROLL node-action=forward-success");
-                        return true;
+                    try {
+                        if (target.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+                            log("SCROLL app=forward-success");
+                            return true;
+                        }
+                    } finally {
+                        if (target != root) target.recycle();
                     }
-                    boolean backward = target.performAction(
-                            AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
-                    if (backward) {
-                        log("SCROLL node-action=backward-success");
-                        return true;
-                    }
-                    log("SCROLL node-action=failed");
                 }
             } finally {
-                if (target != null && target != root) target.recycle();
                 root.recycle();
             }
         }
 
         boolean dispatched = instance.dispatchScrollGesture();
-        log("SCROLL gesture-fallback dispatched=" + dispatched);
+        log("SCROLL app=gesture-fallback dispatched=" + dispatched);
         return dispatched;
+    }
+
+    public static boolean scrollChat() {
+        return instance != null && instance.scrollOwnView(CHAT_SCROLL_ID, "chat");
+    }
+
+    public static boolean scrollLog() {
+        return instance != null && instance.scrollOwnView(LOG_SCROLL_ID, "log");
+    }
+
+    private boolean scrollOwnView(String viewId, String name) {
+        AccessibilityNodeInfo root = findOwnApplicationRoot();
+        if (root == null) {
+            log("SCROLL own=" + name + " failed: app window not found");
+            return false;
+        }
+        try {
+            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByViewId(viewId);
+            if (nodes == null || nodes.isEmpty()) {
+                log("SCROLL own=" + name + " failed: view not found");
+                return false;
+            }
+            for (AccessibilityNodeInfo node : nodes) {
+                if (node == null) continue;
+                try {
+                    if (node.isScrollable() &&
+                            node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+                        log("SCROLL own=" + name + " success");
+                        return true;
+                    }
+                } finally {
+                    node.recycle();
+                }
+            }
+            log("SCROLL own=" + name + " failed: action rejected");
+            return false;
+        } finally {
+            root.recycle();
+        }
+    }
+
+    private AccessibilityNodeInfo findOwnApplicationRoot() {
+        return findWindowRoot(true);
+    }
+
+    private AccessibilityNodeInfo findVisibleApplicationRoot() {
+        return findWindowRoot(false);
+    }
+
+    /**
+     * Select an application window only. This deliberately excludes TYPE_INPUT_METHOD,
+     * which is the keyboard window and was the reason scrolling became unreliable.
+     */
+    private AccessibilityNodeInfo findWindowRoot(boolean ownOnly) {
+        List<AccessibilityWindowInfo> windows = getWindows();
+        if (windows == null || windows.isEmpty()) return null;
+
+        AccessibilityNodeInfo active = null;
+        AccessibilityNodeInfo focused = null;
+        AccessibilityNodeInfo fallback = null;
+
+        for (AccessibilityWindowInfo window : windows) {
+            if (window == null) continue;
+            try {
+                if (window.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) continue;
+
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) continue;
+
+                CharSequence pkg = root.getPackageName();
+                boolean isOwn = pkg != null && OWN_PACKAGE.contentEquals(pkg);
+                if (ownOnly && !isOwn) {
+                    root.recycle();
+                    continue;
+                }
+
+                if (ownOnly) {
+                    if (fallback == null) fallback = root;
+                    else root.recycle();
+                    continue;
+                }
+
+                if (window.isActive()) {
+                    if (active == null) active = root;
+                    else root.recycle();
+                } else if (window.isFocused()) {
+                    if (focused == null) focused = root;
+                    else root.recycle();
+                } else if (fallback == null) {
+                    fallback = root;
+                } else {
+                    root.recycle();
+                }
+            } finally {
+                window.recycle();
+            }
+        }
+
+        if (active != null) {
+            if (focused != null) focused.recycle();
+            if (fallback != null) fallback.recycle();
+            return active;
+        }
+        if (focused != null) {
+            if (fallback != null) fallback.recycle();
+            return focused;
+        }
+        return fallback;
     }
 
     private static AccessibilityNodeInfo findBestScrollableNode(AccessibilityNodeInfo root) {
@@ -108,15 +220,22 @@ public class MyAiAccessibilityService extends AccessibilityService {
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child == null) continue;
+
             AccessibilityNodeInfo candidate = findScrollable(child, centerX, centerY);
-            if (candidate != null) {
-                Rect bounds = new Rect();
-                candidate.getBoundsInScreen(bounds);
-                long area = (long) bounds.width() * bounds.height();
-                if (best == null || area > bestArea) {
-                    best = candidate;
-                    bestArea = area;
-                }
+            child.recycle();
+
+            if (candidate == null) continue;
+
+            Rect bounds = new Rect();
+            candidate.getBoundsInScreen(bounds);
+            long area = (long) bounds.width() * bounds.height();
+
+            if (best == null || area > bestArea) {
+                if (best != null && best != node) best.recycle();
+                best = candidate;
+                bestArea = area;
+            } else if (candidate != node) {
+                candidate.recycle();
             }
         }
         return best;
