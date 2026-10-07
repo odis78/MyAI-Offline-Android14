@@ -34,7 +34,7 @@ public class AgentCommandParserTest {
                 AgentCommandParser.fromNaturalLanguage("скролл вниз").action());
         assertEquals(AgentContracts.Action.SCROLL_DOWN,
                 AgentCommandParser.fromNaturalLanguage("scroll down").action());
-        assertEquals(AgentContracts.Action.SCROLL_DOWN,
+        assertEquals(AgentContracts.Action.SCROLL_LOG,
                 AgentCommandParser.fromNaturalLanguage("прокрути журнал вниз").action());
         assertEquals(AgentContracts.Action.SCROLL_DOWN,
                 AgentCommandParser.fromNaturalLanguage("пролистай экран вниз").action());
