@@ -6,6 +6,7 @@ on:
     branches:
       - infinix
       - infinix-chatgpt
+      - myai-agent-infinix
 
 permissions:
   contents: read
