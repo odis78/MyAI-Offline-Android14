@@ -100,8 +100,15 @@ public class MainActivity extends Activity {
             }
             case SCROLL_DOWN -> {
                 append("AGENT TOOL: SCROLL_DOWN requestId=" + command.requestId());
-                executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollDown,
-                        "Готово: прокрутил экран вниз.");
+                TestAction action = MyAiAccessibilityService.isConnected()
+                        ? MyAiAccessibilityService::scrollDown : () -> false;
+                executeAgentBridgeCommand(command, action,
+                        "Готово: прокрутил активный экран вниз.");
+            }
+            case SCROLL_LOG -> {
+                append("AGENT TOOL: SCROLL_LOG requestId=" + command.requestId());
+                executeAgentBridgeCommand(command, MyAiAccessibilityService::scrollLog,
+                        "Готово: прокрутил журнал вниз.");
             }
             case OPEN_APP -> {
                 append("AGENT TOOL: OPEN_APP payload=" + command.payload() +
@@ -182,19 +189,18 @@ public class MainActivity extends Activity {
             return;
         }
         if (matchesApp(normalized, "контакты", "контакт", "телефонная книга", "contacts")) {
-            Intent contacts = new Intent(Intent.ACTION_VIEW,
-                    android.provider.ContactsContract.Contacts.CONTENT_URI);
-            if (contacts.resolveActivity(getPackageManager()) != null) {
+            // Prefer an explicit launcher activity. ACTION_VIEW on contacts:// can show
+            // an Android "Open with" chooser on devices with multiple contact providers.
+            Intent contacts = findLaunchIntentByName("контакты");
+            if (contacts == null) contacts = findLaunchIntentByName("contacts");
+            if (contacts == null) {
+                contacts = getPackageManager().getLaunchIntentForPackage("com.android.contacts");
+            }
+            if (contacts == null) {
+                contacts = getPackageManager().getLaunchIntentForPackage("com.google.android.contacts");
+            }
+            if (contacts != null) {
                 openExternalIntent(contacts, "OPEN_CONTACTS", "Готово: открыл контакты.");
-                return;
-            }
-            Intent packageIntent = getPackageManager().getLaunchIntentForPackage("com.android.contacts");
-            if (packageIntent == null) {
-                packageIntent = getPackageManager().getLaunchIntentForPackage("com.google.android.contacts");
-            }
-            if (packageIntent == null) packageIntent = findLaunchIntentByName("contacts");
-            if (packageIntent != null) {
-                openExternalIntent(packageIntent, "OPEN_CONTACTS", "Готово: открыл контакты.");
             } else {
                 appendChat("MyAI: приложение контактов не найдено.");
                 append("OPEN_CONTACTS: FAILED (APP NOT FOUND)");
@@ -371,8 +377,8 @@ public class MainActivity extends Activity {
     }
 
     private void testScroll() {
-        executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollDown,
-                "Готово: прокрутил экран вниз.");
+        executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollChat,
+                "Готово: прокрутил основной экран вниз.");
     }
 
     private void refresh() {
