@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.homeButton).setOnClickListener(v -> testHome());
         findViewById(R.id.backButton).setOnClickListener(v -> testBack());
         findViewById(R.id.scrollButton).setOnClickListener(v -> testScroll());
+        findViewById(R.id.logScrollButton).setOnClickListener(v -> testLogScroll());
         findViewById(R.id.refreshButton).setOnClickListener(v -> refresh());
         findViewById(R.id.sendCommandButton).setOnClickListener(v -> submitCommand());
 
@@ -379,6 +380,11 @@ public class MainActivity extends Activity {
     private void testScroll() {
         executeBridgeCommand("SCROLL_DOWN", MyAiAccessibilityService::scrollChat,
                 "Готово: прокрутил основной экран вниз.");
+    }
+
+    private void testLogScroll() {
+        executeBridgeCommand("SCROLL_LOG", MyAiAccessibilityService::scrollLog,
+                "Готово: прокрутил журнал вниз.");
     }
 
     private void refresh() {
