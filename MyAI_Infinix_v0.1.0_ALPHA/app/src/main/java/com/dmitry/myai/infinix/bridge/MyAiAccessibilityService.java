@@ -1,7 +1,7 @@
 package com.dmitry.myai.infinix.bridge;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.AccessibilityWindowInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.graphics.Rect;
