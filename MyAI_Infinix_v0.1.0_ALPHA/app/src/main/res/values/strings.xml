@@ -12,6 +12,7 @@
     <string name="test_home">Тест: Домой</string>
     <string name="test_back">Тест: Назад</string>
     <string name="test_scroll">Тест: Прокрутка вниз</string>
+    <string name="test_log_scroll">Тест: Прокрутка журнала</string>
     <string name="refresh_status">Обновить статус</string>
     <string name="journal">Журнал</string>
     <string name="gateway_title">MyAI — AI Gateway</string>
