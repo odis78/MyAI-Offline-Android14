@@ -38,6 +38,17 @@ public class AgentCommandParserTest {
                 AgentCommandParser.fromNaturalLanguage("прокрути журнал вниз").action());
         assertEquals(AgentContracts.Action.SCROLL_DOWN,
                 AgentCommandParser.fromNaturalLanguage("пролистай экран вниз").action());
+        assertEquals(AgentContracts.Action.SCROLL_LOG,
+                AgentCommandParser.fromNaturalLanguage("прокрути журнал вниз").action());
+        assertEquals(AgentContracts.Action.SCROLL_LOG,
+                AgentCommandParser.fromNaturalLanguage("пролистай журнал").action());
+    }
+
+    @Test public void modelScrollLog() {
+        String json = "{\"type\":\"tool_call\",\"request_id\":\"log-1\",\"tool\":\"scroll_log\"}";
+        AgentContracts.AgentCommand c = AgentCommandParser.fromModelJson(json);
+        assertEquals("log-1", c.requestId());
+        assertEquals(AgentContracts.Action.SCROLL_LOG, c.action());
     }
 
     @Test public void naturalContacts() {
