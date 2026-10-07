@@ -96,7 +96,7 @@ gateway_activity = (r / "app/src/main/java/com/dmitry/myai/infinix/GatewayActivi
 gateway_layout = (r / "app/src/main/res/layout/activity_gateway.xml").read_text(encoding="utf-8")
 
 for marker in [
-    "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "refresh",
+    "ACTION_ACCESSIBILITY_SETTINGS", "testHome", "testBack", "testScroll", "testLogScroll", "refresh",
     "ACTION_SETTINGS", "submitCommand", "executeBridgeCommand",
     "OPEN_YOUTUBE", "OPEN_CHATGPT", "com.openai.chatgpt", "findLaunchIntentByName", "executeAgentCommand", "AgentResultCodec"
 ]:
@@ -127,9 +127,10 @@ for forbidden in ["sk-", "OPENAI_API_KEY", "Authorization: Bearer", "api_key"]:
 
 for marker in [
     "GLOBAL_ACTION_HOME", "GLOBAL_ACTION_BACK", "performGlobalAction",
-    "getRootInActiveWindow", "ACTION_SCROLL_FORWARD", "ACTION_SCROLL_BACKWARD",
+    "findVisibleApplicationRoot", "findOwnApplicationRoot", "ACTION_SCROLL_FORWARD",
     "dispatchGesture", "dispatchBackSwipe", "GestureResultCallback", "getRealMetrics",
-    "bestArea = 0", "area > bestArea", "root.recycle()"
+    "bestArea = 0", "area > bestArea", "root.recycle()", "TYPE_APPLICATION",
+    "scrollOwnView", "CHAT_SCROLL_ID", "LOG_SCROLL_ID"
 ]:
     if marker not in bridge:
         raise SystemExit(f"Accessibility marker missing: {marker}")
@@ -147,7 +148,7 @@ if "typeViewTextChanged" in accessibility_config:
 for view_id in [
     "statusText", "chatText", "chatScroll", "commandInput", "sendCommandButton", "gatewayButton",
     "chatgptButton", "logText", "logScroll", "openAccessibilityButton", "homeButton",
-    "backButton", "scrollButton", "refreshButton", "logText"
+    "backButton", "scrollButton", "logScrollButton", "refreshButton", "logText"
 ]:
     if view_id not in layout:
         raise SystemExit(f"Required UI id missing: {view_id}")
