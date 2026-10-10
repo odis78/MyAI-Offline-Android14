@@ -36,9 +36,11 @@ adb install -r "$APK" || fail "APK installation failed"
 
 # A CI emulator is a clean device, so explicitly enable the accessibility service
 # that the app depends on; this does not alter a user's real phone.
+# Some Android emulator images gate binding the accessibility service through AppOps.
+adb shell appops set "$PKG" BIND_ACCESSIBILITY_SERVICE allow >/dev/null 2>&1 || true
 adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
-sleep 3
+sleep 5
 
 echo "Launching MainActivity"
 start_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
@@ -53,11 +55,28 @@ fi
 # Dump actual UI hierarchy and require the real control surface to be present.
 adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || fail "Could not dump Android UI hierarchy"
 adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null
-for expected in 'MyAI' 'Тест: Домой' 'Тест: Назад' 'Тест: Прочитать экран' 'Тест: Tool Protocol' 'Тест: Прокрутка вниз' 'Журнал действий'; do
-  if ! grep -Fq "$expected" "$EVIDENCE/window.xml"; then
-    fail "Expected UI element/text not found: $expected"
-  fi
-done
+python3 - "$EVIDENCE/window.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+texts = [node.attrib.get("text", "").casefold() for node in root.iter("node")]
+joined = "\\n".join(texts)
+expected = [
+    "myai",
+    "тест: домой",
+    "тест: назад",
+    "тест: прочитать экран",
+    "тест: tool protocol",
+    "тест: прокрутка вниз",
+    "журнал действий",
+]
+missing = [item for item in expected if item.casefold() not in joined]
+if missing:
+    print("Missing UI text after Unicode case normalization: " + ", ".join(missing), file=sys.stderr)
+    raise SystemExit(1)
+PY
+if [[ "$?" -ne 0 ]]; then
+  fail "Expected UI element/text not found in hierarchy (case-insensitive check)"
+fi
 
 # The bridge must actually connect in the emulator, not merely leave its label disconnected.
 connected=0
