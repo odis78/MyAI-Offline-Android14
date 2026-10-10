@@ -51,8 +51,8 @@ if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities.txt" | 
 fi
 
 # Dump actual UI hierarchy and require the real control surface to be present.
-adb shell uiautomator dump /sdcard/myai-window.xml >/dev/null 2>&1 || fail "Could not dump Android UI hierarchy"
-adb pull /sdcard/myai-window.xml "$EVIDENCE/window.xml" >/dev/null
+adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || fail "Could not dump Android UI hierarchy"
+adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null
 for expected in 'MyAI' 'Тест: Домой' 'Тест: Назад' 'Тест: Прочитать экран' 'Тест: Tool Protocol' 'Тест: Прокрутка вниз' 'Журнал действий'; do
   if ! grep -Fq "$expected" "$EVIDENCE/window.xml"; then
     fail "Expected UI element/text not found: $expected"
@@ -62,8 +62,8 @@ done
 # The bridge must actually connect in the emulator, not merely leave its label disconnected.
 connected=0
 for attempt in $(seq 1 15); do
-  adb shell uiautomator dump /sdcard/myai-window.xml >/dev/null 2>&1 || true
-  adb pull /sdcard/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1 || true
+  adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
+  adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1 || true
   if grep -Fq 'Control Bridge: ПОДКЛЮЧЕН' "$EVIDENCE/window.xml"; then connected=1; break; fi
   sleep 2
 done
@@ -73,8 +73,8 @@ done
 # using their actual resource IDs and bounds from the Android accessibility tree.
 tap_resource() {
   local resource_id="$1"
-  adb shell uiautomator dump /sdcard/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed before tap $resource_id"
-  adb pull /sdcard/myai-window.xml "$EVIDENCE/window.xml" >/dev/null
+  adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed before tap $resource_id"
+  adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null
   local bounds
   bounds="$(python3 - "$EVIDENCE/window.xml" "$resource_id" <<'PY'
 import sys, xml.etree.ElementTree as ET, re
@@ -96,15 +96,15 @@ PY
 }
 
 tap_resource "testScreen"
-adb shell uiautomator dump /sdcard/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed after screen-state test"
-adb pull /sdcard/myai-window.xml "$EVIDENCE/window-after-screen.xml" >/dev/null
+adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed after screen-state test"
+adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window-after-screen.xml" >/dev/null
 # UI labels or results can vary; require the app to remain foreground and capture the output.
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
 tap_resource "testTool"
-adb shell uiautomator dump /sdcard/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed after tool protocol test"
-adb pull /sdcard/myai-window.xml "$EVIDENCE/window-after-tool.xml" >/dev/null
+adb shell uiautomator dump /data/local/tmp/myai-window.xml >/dev/null 2>&1 || fail "UI dump failed after tool protocol test"
+adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window-after-tool.xml" >/dev/null
 if ! grep -Fq 'home:' "$EVIDENCE/window-after-tool.xml" && ! grep -Fq 'Tool Protocol' "$EVIDENCE/window-after-tool.xml"; then
   echo "Note: tool action is recorded in app logcat; validating process and crash state instead."
 fi
