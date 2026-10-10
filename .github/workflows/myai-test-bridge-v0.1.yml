@@ -84,16 +84,16 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK="MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk"
+            APK="$GITHUB_WORKSPACE/MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk"
             test -s "$APK"
             adb install -r "$APK"
             adb shell am force-stop com.dmitry.myai.infinix || true
             adb shell am start -W -n com.dmitry.myai.infinix/.MainActivity
             sleep 3
             adb shell dumpsys activity activities | grep -F "com.dmitry.myai.infinix/.MainActivity"
-            mkdir -p test-bridge/android-evidence
-            adb exec-out screencap -p > test-bridge/android-evidence/android-emulator.png
-            adb logcat -d -t 3000 > test-bridge/android-evidence/logcat.txt
+            mkdir -p "$GITHUB_WORKSPACE/test-bridge/android-evidence"
+            adb exec-out screencap -p > "$GITHUB_WORKSPACE/test-bridge/android-evidence/android-emulator.png"
+            adb logcat -d -t 3000 > "$GITHUB_WORKSPACE/test-bridge/android-evidence/logcat.txt"
       - name: Upload Android evidence and APK
         if: always()
         uses: actions/upload-artifact@v4
