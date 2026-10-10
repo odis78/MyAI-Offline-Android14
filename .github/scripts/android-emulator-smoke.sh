@@ -34,13 +34,20 @@ done
 echo "Installing APK"
 adb install -r "$APK" || fail "APK installation failed"
 
-# A CI emulator is a clean device, so explicitly enable the accessibility service
-# that the app depends on; this does not alter a user's real phone.
-# Some Android emulator images gate binding the accessibility service through AppOps.
-adb shell appops set "$PKG" BIND_ACCESSIBILITY_SERVICE allow >/dev/null 2>&1 || true
+# A CI emulator is a clean device. Clear old logs, then perform a complete
+# accessibility rebind cycle. Merely writing accessibility_enabled=1 can leave
+# the framework with stale service-binding state on some emulator images.
+adb logcat -c >/dev/null 2>&1 || true
+adb shell settings put secure accessibility_enabled 0
+adb shell settings delete secure enabled_accessibility_services
+sleep 2
 adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
 sleep 5
+
+echo "Accessibility setting enabled: $(adb shell settings get secure accessibility_enabled | tr -d '\\r')"
+echo "Accessibility services setting: $(adb shell settings get secure enabled_accessibility_services | tr -d '\\r')"
+adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-launch.txt" 2>&1 || true
 
 echo "Launching MainActivity"
 start_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
@@ -137,7 +144,23 @@ for attempt in $(seq 1 30); do
   fi
   sleep 2
 done
-[[ "$connected" -eq 1 ]] || fail "Accessibility Bridge service did not emit SERVICE CONNECTED"
+if [[ "$connected" -ne 1 ]]; then
+  # Save the framework's explanation instead of only reporting a missing log.
+  adb shell settings get secure enabled_accessibility_services > "$EVIDENCE/enabled-accessibility-services.txt" 2>&1 || true
+  adb shell settings get secure accessibility_enabled > "$EVIDENCE/accessibility-enabled.txt" 2>&1 || true
+  adb shell dumpsys accessibility > "$EVIDENCE/dumpsys-accessibility-failure.txt" 2>&1 || true
+  adb shell dumpsys package "$PKG" > "$EVIDENCE/dumpsys-package-failure.txt" 2>&1 || true
+  adb logcat -d -b main -b system -b events -v time > "$EVIDENCE/logcat-accessibility-failure.txt" 2>&1 || true
+  echo "---- enabled_accessibility_services ----"
+  cat "$EVIDENCE/enabled-accessibility-services.txt" 2>/dev/null || true
+  echo "---- accessibility_enabled ----"
+  cat "$EVIDENCE/accessibility-enabled.txt" 2>/dev/null || true
+  echo "---- accessibility framework service state ----"
+  grep -i -E 'myai|Enabled services|Bound services|Crashed services|AccessibilityService' "$EVIDENCE/dumpsys-accessibility-failure.txt" | tail -n 100 || true
+  echo "---- relevant Android logcat ----"
+  grep -i -E 'myai.infinix|MyAI-Infinix|AccessibilityManager|AccessibilityService|Permission Denial|FATAL EXCEPTION|Exception' "$EVIDENCE/logcat-accessibility-failure.txt" | tail -n 160 || true
+  fail "Accessibility Bridge service did not emit SERVICE CONNECTED (diagnostics saved)"
+fi
 
 # Exercise the in-app tool protocol and screen-state command by tapping controls
 # using their actual resource IDs and bounds from the Android accessibility tree.
