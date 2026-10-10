@@ -62,6 +62,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Create temporary CI signing key for Gradle configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/myai-test-bridge.jks"
+          keytool -genkeypair -noprompt -keystore "$key" -storepass testpassword -keypass testpassword -alias testkey -dname "CN=MyAI Test Bridge, OU=CI, O=OpenAI, L=Test, ST=Test, C=US" -keyalg RSA -keysize 2048 -validity 2
+          echo "MYAI_KEYSTORE_PATH=$key" >> "$GITHUB_ENV"
+          echo "MYAI_KEYSTORE_PASSWORD=testpassword" >> "$GITHUB_ENV"
+          echo "MYAI_KEY_ALIAS=testkey" >> "$GITHUB_ENV"
+          echo "MYAI_KEY_PASSWORD=testpassword" >> "$GITHUB_ENV"
       - name: Build debug APK
         working-directory: MyAI_Infinix_v0.1.0_ALPHA
         run: gradle :app:assembleDebug --stacktrace --no-daemon
