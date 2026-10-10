@@ -21,7 +21,7 @@ The keystore itself must never be committed to the repository.
 
 The permanent certificate SHA-256 fingerprint is:
 
-`FD:5D:81:CA:CB:DB:A2:5E:96:C6:E6:1B:CE:5A:C4:0C:BD:68:0B:E6:85:19:26:64:19:45:3B:CA:C5:9C:B9:06`
+`19:E7:DD:5A:EB:7A:23:52:69:B8:F6:F4:33:F6:8F:1B:E0:F3:C3:BC:1B:14:5B:C2:1F:DB:A5:26:EB:1E:CB:64`
 
 The workflow refuses to publish an APK signed by a different certificate.
 
