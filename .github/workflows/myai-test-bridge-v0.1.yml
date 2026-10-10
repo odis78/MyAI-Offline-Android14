@@ -7,6 +7,7 @@ on:
     paths:
       - 'test-bridge/**'
       - '.github/workflows/myai-test-bridge-v0.1.yml'
+      - '.github/scripts/**'
       - 'MyAI_Infinix_v0.1.0_ALPHA/**'
 
 permissions:
@@ -39,7 +40,6 @@ jobs:
           name: myai-test-bridge-browser-report
           path: |
             test-bridge/playwright-report/
-            test-bridge/test-results/
             test-bridge/test-results/
           if-no-files-found: warn
           retention-days: 14
