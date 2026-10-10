@@ -34,8 +34,6 @@ android {
             debuggable false
             if (System.getenv('MYAI_KEYSTORE_PATH')) {
                 signingConfig signingConfigs.release
-            } else {
-                throw new GradleException('Permanent MyAI Infinix release signing is required. Configure the MyAI signing environment variables.')
             }
         }
     }
@@ -43,5 +41,13 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+}
+def hasReleaseSigning = System.getenv('MYAI_KEYSTORE_PATH') != null
+tasks.configureEach {
+    if (name.toLowerCase().contains('release') && !hasReleaseSigning) {
+        doFirst {
+            throw new GradleException('Permanent MyAI Infinix release signing is required. Configure the MyAI signing environment variables.')
+        }
     }
 }
