@@ -69,8 +69,8 @@ adb shell settings --user 0 put secure accessibility_enabled 1 || fail "Could no
 
 settings_ready=0
 for attempt in $(seq 1 15); do
-  enabled="$(adb shell settings --user 0 get secure accessibility_enabled 2>/dev/null | tr -d '\\r' || true)"
-  services="$(adb shell settings --user 0 get secure enabled_accessibility_services 2>/dev/null | tr -d '\\r' || true)"
+  enabled="$(adb shell settings --user 0 get secure accessibility_enabled 2>/dev/null | tr -d '\r' || true)"
+  services="$(adb shell settings --user 0 get secure enabled_accessibility_services 2>/dev/null | tr -d '\r' || true)"
   if [[ "$enabled" == "1" ]] && printf '%s' "$services" | grep -Fq "$SERVICE"; then
     settings_ready=1
     break
@@ -90,7 +90,7 @@ adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-launch.txt" 2>
 
 echo "Launching MainActivity for UI assertions"
 start_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
-printf '%s\\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
+printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
 sleep 5
 
 adb shell dumpsys activity activities > "$EVIDENCE/activities.txt"
@@ -103,7 +103,7 @@ fi
 dump_ui() {
   local output=""
   for attempt in $(seq 1 5); do
-    output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\\r' || true)"
+    output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
     if adb shell test -s /data/local/tmp/myai-window.xml >/dev/null 2>&1; then
       if adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1; then
         return 0
@@ -148,7 +148,7 @@ if ! python3 - "$EVIDENCE/window.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 texts = [node.attrib.get("text", "").casefold() for node in root.iter("node")]
-joined = "\\n".join(texts)
+joined = "\n".join(texts)
 expected = [
     "myai",
     "тест: домой",
