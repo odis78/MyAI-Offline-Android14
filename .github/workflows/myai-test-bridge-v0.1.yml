@@ -84,8 +84,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             set -eu
-            APK="$GITHUB_WORKSPACE/MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk"
-            test -s "$APK"
+            APK="$GITHUB_WORKSPACE/MyAI_Infinix_v0.1.0_ALPHA/build/outputs/apk/debug/app-debug.apk"
+            if [ ! -s "$APK" ]; then
+              echo "APK not found at expected path. Searching build outputs:"
+              find "$GITHUB_WORKSPACE/MyAI_Infinix_v0.1.0_ALPHA" -type f -name "*.apk" -print
+              exit 1
+            fi
             adb start-server
             adb wait-for-device
             booted=0
@@ -113,7 +117,7 @@ jobs:
         with:
           name: myai-test-bridge-android-smoke
           path: |
-            MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+            MyAI_Infinix_v0.1.0_ALPHA/build/outputs/apk/debug/app-debug.apk
             test-bridge/android-evidence/
           if-no-files-found: warn
           retention-days: 14
