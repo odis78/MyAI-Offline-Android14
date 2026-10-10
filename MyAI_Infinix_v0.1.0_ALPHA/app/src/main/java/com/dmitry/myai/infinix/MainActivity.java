@@ -36,7 +36,13 @@ public class MainActivity extends Activity {
         updateBridgeStatus();
     }
     void run(Runnable r){try{r.run();append("TEST dispatched");}catch(Exception e){append("ERROR: "+e.getMessage());}}
-    void runTool(String json){var r=agent.dispatchJson(json); append(r.tool+": "+(r.success?"OK ":"FAIL ")+r.message); if(!r.dataJson.equals("{}")) append(r.dataJson);}
+    void runTool(String json){
+        var r=agent.dispatchJson(json);
+        String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
+        append(result);
+        android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
+        if(!r.dataJson.equals("{}")) append(r.dataJson);
+    }
     private void updateBridgeStatus(){
         if (status != null) status.setText(MyAiAccessibilityService.isConnected()?"Control Bridge: ПОДКЛЮЧЕН":"Control Bridge: НЕ ПОДКЛЮЧЕН");
     }

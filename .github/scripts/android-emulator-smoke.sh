@@ -34,24 +34,63 @@ done
 echo "Installing APK"
 adb install -r "$APK" || fail "APK installation failed"
 
-# A CI emulator is a clean device. Clear old logs, then perform a complete
-# accessibility rebind cycle. Merely writing accessibility_enabled=1 can leave
-# the framework with stale service-binding state on some emulator images.
+# Start the app before changing secure accessibility settings. On fresh API
+# emulator images PackageManager/AccessibilityManager can lag behind adb install;
+# enabling a component before it appears in the installed-service list can cause
+# the framework to immediately discard the setting.
 adb logcat -c >/dev/null 2>&1 || true
-adb shell settings put secure accessibility_enabled 0
-adb shell settings delete secure enabled_accessibility_services
-sleep 2
-adb shell settings put secure enabled_accessibility_services "$SERVICE"
-adb shell settings put secure accessibility_enabled 1
+echo "Launching MainActivity once to initialize package/service discovery"
+prestart_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
+printf '%s\n' "$prestart_output" | tee "$EVIDENCE/activity-prestart.txt"
 sleep 5
 
-echo "Accessibility setting enabled: $(adb shell settings get secure accessibility_enabled | tr -d '\\r')"
-echo "Accessibility services setting: $(adb shell settings get secure enabled_accessibility_services | tr -d '\\r')"
+service_discovered=0
+for attempt in $(seq 1 60); do
+  installed_count="$(adb shell dumpsys accessibility 2>/dev/null | grep -oE 'installedServiceCount=[0-9]+' | head -n 1 | cut -d= -f2 || true)"
+  if [[ "$installed_count" =~ ^[0-9]+$ ]] && (( installed_count >= 2 )); then
+    service_discovered=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$service_discovered" -ne 1 ]]; then
+  adb shell dumpsys accessibility > "$EVIDENCE/accessibility-discovery-failure.txt" 2>&1 || true
+  adb shell dumpsys package "$PKG" > "$EVIDENCE/package-discovery-failure.txt" 2>&1 || true
+  fail "AccessibilityManager did not discover the installed MyAI service"
+fi
+
+# Explicitly target Android's primary user and verify every setting write.
+adb shell settings --user 0 put secure accessibility_enabled 0 || fail "Could not disable accessibility before rebind"
+adb shell settings --user 0 delete secure enabled_accessibility_services || fail "Could not clear old accessibility service list"
+sleep 2
+adb shell settings --user 0 put secure enabled_accessibility_services "$SERVICE" || fail "Could not enable MyAI accessibility service"
+sleep 1
+adb shell settings --user 0 put secure accessibility_enabled 1 || fail "Could not enable the accessibility master switch"
+
+settings_ready=0
+for attempt in $(seq 1 15); do
+  enabled="$(adb shell settings --user 0 get secure accessibility_enabled 2>/dev/null | tr -d '\\r' || true)"
+  services="$(adb shell settings --user 0 get secure enabled_accessibility_services 2>/dev/null | tr -d '\\r' || true)"
+  if [[ "$enabled" == "1" ]] && printf '%s' "$services" | grep -Fq "$SERVICE"; then
+    settings_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$settings_ready" -ne 1 ]]; then
+  adb shell settings --user 0 get secure enabled_accessibility_services > "$EVIDENCE/enabled-accessibility-services.txt" 2>&1 || true
+  adb shell settings --user 0 get secure accessibility_enabled > "$EVIDENCE/accessibility-enabled.txt" 2>&1 || true
+  adb shell dumpsys accessibility > "$EVIDENCE/dumpsys-accessibility-settings-failure.txt" 2>&1 || true
+  fail "Accessibility settings did not persist after enabling MyAI service"
+fi
+
+echo "Accessibility setting enabled: $enabled"
+echo "Accessibility services setting: $services"
 adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-launch.txt" 2>&1 || true
 
-echo "Launching MainActivity"
+echo "Launching MainActivity for UI assertions"
 start_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
-printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
+printf '%s\\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
 sleep 5
 
 adb shell dumpsys activity activities > "$EVIDENCE/activities.txt"
@@ -105,7 +144,7 @@ PY
   dump_ui
 fi
 
-python3 - "$EVIDENCE/window.xml" <<'PY'
+if ! python3 - "$EVIDENCE/window.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 texts = [node.attrib.get("text", "").casefold() for node in root.iter("node")]
@@ -124,7 +163,7 @@ if missing:
     print("Missing UI text after Unicode case normalization: " + ", ".join(missing), file=sys.stderr)
     raise SystemExit(1)
 PY
-if [[ "$?" -ne 0 ]]; then
+then
   fail "Expected UI element/text not found in hierarchy (case-insensitive check)"
 fi
 
@@ -188,6 +227,7 @@ PY
 }
 
 tap_resource "testScreen"
+adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT get_screen_state: OK screen captured' || fail "get_screen_state tool did not report success"
 dump_ui || fail "UI dump failed after screen-state test"
 cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
 # UI labels or results can vary; require the app to remain foreground and capture the output.
@@ -195,11 +235,9 @@ adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
 tap_resource "testTool"
+adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT home: OK dispatched' || fail "Tool protocol home command did not report success"
 dump_ui || fail "UI dump failed after tool protocol test"
 cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-tool.xml"
-if ! grep -Fq 'home:' "$EVIDENCE/window-after-tool.xml" && ! grep -Fq 'Tool Protocol' "$EVIDENCE/window-after-tool.xml"; then
-  echo "Note: tool action is recorded in app logcat; validating process and crash state instead."
-fi
 
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
 adb logcat -d -t 8000 > "$EVIDENCE/logcat.txt"
