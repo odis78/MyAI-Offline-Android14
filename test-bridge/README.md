@@ -32,3 +32,7 @@ A test is only marked passed when the runner reports success. Simulator checks a
 - Failure screenshot/video/trace
 - Android emulator screenshot and logcat
 - Debug APK used by the emulator smoke test
+
+## CI signing note
+
+The Android smoke job creates a short-lived CI-only keystore because this project validates release signing configuration during Gradle configuration. The test key is never used for a release APK or distributed update.
