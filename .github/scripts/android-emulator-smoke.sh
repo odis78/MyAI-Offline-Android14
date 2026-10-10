@@ -116,7 +116,7 @@ dump_ui() {
 }
 dump_ui
 
-# The headless API-35 emulator can occasionally show a system Settings ANR dialog
+# The headless Android emulator can occasionally show a system Settings ANR dialog
 # after accessibility is toggled. Dismiss it using the actual UI bounds, then
 # relaunch our activity before asserting app UI.
 if grep -Fq "Settings isn't responding" "$EVIDENCE/window.xml"; then

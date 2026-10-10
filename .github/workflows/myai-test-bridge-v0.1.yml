@@ -72,6 +72,8 @@ jobs:
           echo "MYAI_KEYSTORE_PASSWORD=testpassword" >> "$GITHUB_ENV"
           echo "MYAI_KEY_ALIAS=testkey" >> "$GITHUB_ENV"
           echo "MYAI_KEY_PASSWORD=testpassword" >> "$GITHUB_ENV"
+      - name: Run source sanity checks
+        run: bash MyAI_Infinix_v0.1.0_ALPHA/sanity_check.sh
       - name: Build debug APK
         working-directory: MyAI_Infinix_v0.1.0_ALPHA
         run: gradle :app:assembleDebug --stacktrace --no-daemon
