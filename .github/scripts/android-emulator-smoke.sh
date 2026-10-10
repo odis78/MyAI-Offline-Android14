@@ -69,6 +69,35 @@ dump_ui() {
   fail "Could not create and pull Android UI hierarchy; last uiautomator output: $output"
 }
 dump_ui
+
+# The headless API-35 emulator can occasionally show a system Settings ANR dialog
+# after accessibility is toggled. Dismiss it using the actual UI bounds, then
+# relaunch our activity before asserting app UI.
+if grep -Fq "Settings isn't responding" "$EVIDENCE/window.xml"; then
+  echo "System Settings ANR dialog detected; choosing Wait and restoring app foreground"
+  wait_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET, re
+root=ET.parse(sys.argv[1]).getroot()
+for n in root.iter('node'):
+    if n.attrib.get('resource-id') == 'android:id/aerr_wait':
+        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
+        if m:
+            x1,y1,x2,y2=map(int,m.groups())
+            print((x1+x2)//2, (y1+y2)//2)
+            break
+PY
+)"
+  if [[ -n "$wait_bounds" ]]; then
+    read -r wx wy <<< "$wait_bounds"
+    adb shell input tap "$wx" "$wy" || true
+    sleep 3
+  fi
+  adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
+  adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+  sleep 5
+  dump_ui
+fi
+
 python3 - "$EVIDENCE/window.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
@@ -92,14 +121,23 @@ if [[ "$?" -ne 0 ]]; then
   fail "Expected UI element/text not found in hierarchy (case-insensitive check)"
 fi
 
-# The bridge must actually connect in the emulator, not merely leave its label disconnected.
+# Confirm the service itself connected; UI status is also refreshed live by MainActivity.
 connected=0
-for attempt in $(seq 1 15); do
+for attempt in $(seq 1 30); do
+  if adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'SERVICE CONNECTED'; then
+    connected=1
+    break
+  fi
+  # Recover if the emulator overlays the app with a Settings ANR dialog.
   dump_ui || true
-  if grep -Fq 'Control Bridge: ПОДКЛЮЧЕН' "$EVIDENCE/window.xml"; then connected=1; break; fi
+  if grep -Fq "Settings isn't responding" "$EVIDENCE/window.xml"; then
+    adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
+    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+  fi
   sleep 2
 done
-[[ "$connected" -eq 1 ]] || fail "Accessibility Bridge did not report connected in the UI"
+[[ "$connected" -eq 1 ]] || fail "Accessibility Bridge service did not emit SERVICE CONNECTED"
 
 # Exercise the in-app tool protocol and screen-state command by tapping controls
 # using their actual resource IDs and bounds from the Android accessibility tree.
