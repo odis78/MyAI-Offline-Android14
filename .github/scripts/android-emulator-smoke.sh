@@ -205,9 +205,13 @@ fi
 # using their actual resource IDs and bounds from the Android accessibility tree.
 tap_resource() {
   local resource_id="$1"
-  dump_ui || fail "UI dump failed before tap $resource_id"
-  local bounds
-  bounds="$(python3 - "$EVIDENCE/window.xml" "$resource_id" <<'PY'
+  local bounds=""
+  # Controls are inside the upper controlScroll. Earlier test actions can leave
+  # later buttons below the visible viewport, so scroll that container until
+  # the requested resource ID appears instead of failing on a valid off-screen node.
+  for attempt in $(seq 1 6); do
+    dump_ui || fail "UI dump failed before tap $resource_id"
+    bounds="$(python3 - "$EVIDENCE/window.xml" "$resource_id" <<'PY'
 import sys, xml.etree.ElementTree as ET, re
 root=ET.parse(sys.argv[1]).getroot()
 target=sys.argv[2]
@@ -216,11 +220,31 @@ for n in root.iter('node'):
         m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
         if m:
             x1,y1,x2,y2=map(int,m.groups())
-            print((x1+x2)//2, (y1+y2)//2)
+            if x2 > x1 and y2 > y1:
+                print((x1+x2)//2, (y1+y2)//2)
+                raise SystemExit(0)
+raise SystemExit(1)
+PY
+)" || true
+    if [[ -n "$bounds" ]]; then break; fi
+    container_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET, re
+root=ET.parse(sys.argv[1]).getroot()
+for n in root.iter('node'):
+    if n.attrib.get('resource-id','').endswith(':id/controlScroll'):
+        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
+        if m:
+            x1,y1,x2,y2=map(int,m.groups())
+            print(x1,y1,x2,y2)
             raise SystemExit(0)
 raise SystemExit(1)
 PY
-)" || fail "Control not found in UI hierarchy: $resource_id"
+)" || fail "Control container not found while searching for $resource_id"
+    read -r x1 y1 x2 y2 <<< "$container_bounds"
+    adb shell input swipe "$((x1+x2)/2)" "$((y2-40))" "$((x1+x2)/2)" "$((y1+40))" 350
+    sleep 1
+  done
+  [[ -n "$bounds" ]] || fail "Control not found after scrolling controlScroll: $resource_id"
   read -r x y <<< "$bounds"
   adb shell input tap "$x" "$y"
   sleep 2
