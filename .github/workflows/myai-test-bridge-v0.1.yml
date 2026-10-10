@@ -81,11 +81,24 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
-          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             set -eu
             APK="$GITHUB_WORKSPACE/MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk"
             test -s "$APK"
+            adb start-server
+            adb wait-for-device
+            booted=0
+            for attempt in $(seq 1 60); do
+              value="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r" || true)"
+              if [ "$value" = "1" ]; then booted=1; break; fi
+              sleep 5
+            done
+            if [ "$booted" -ne 1 ]; then
+              echo "Android boot timeout"
+              adb devices -l || true
+              exit 1
+            fi
             adb install -r "$APK"
             adb shell am force-stop com.dmitry.myai.infinix || true
             adb shell am start -W -n com.dmitry.myai.infinix/.MainActivity
