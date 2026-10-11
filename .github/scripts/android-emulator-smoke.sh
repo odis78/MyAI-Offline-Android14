@@ -51,7 +51,7 @@ adb install -r "$APK" || fail "APK installation failed"
 # the framework to immediately discard the setting.
 adb logcat -c >/dev/null 2>&1 || true
 echo "Launching MainActivity once to initialize package/service discovery"
-prestart_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
+prestart_output="$(adb shell am start -n "$ACTIVITY" 2>&1 || true)"
 printf '%s\n' "$prestart_output" | tee "$EVIDENCE/activity-prestart.txt"
 sleep 5
 
@@ -113,7 +113,7 @@ echo "Accessibility services setting: $services"
 adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-launch.txt" 2>&1 || true
 
 echo "Launching MainActivity for UI assertions"
-start_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
+start_output="$(adb shell am start -n "$ACTIVITY" 2>&1 || true)"
 printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
 sleep 5
 
@@ -179,7 +179,7 @@ recover_unresponsive_dialog() {
     if ! anr_window_visible; then
       echo "ANR overlay dismissed; waiting for system services to settle"
       sleep 4
-      adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+      adb shell am start -n "$ACTIVITY" >/dev/null 2>&1 || true
       sleep 3
       dump_ui || return 1
       return 0
@@ -233,7 +233,7 @@ for attempt in $(seq 1 3); do
     echo "Expected controls are not visible after recovery; restarting MainActivity (attempt $attempt)"
     adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
     sleep 2
-    adb shell am start -W -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-recovery-relaunch-$attempt.txt" || true
+    adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-recovery-relaunch-$attempt.txt" || true
     sleep 8
   fi
 done
@@ -340,7 +340,7 @@ for attempt in $(seq 1 12); do
   recover_unresponsive_dialog || fail "Could not recover from emulator dialog while waiting for tool result"
   if [[ "$dialog_recovered" -eq 1 ]]; then
     # If the dialog had intercepted the previous tap, bring the app back and retry.
-    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+    adb shell am start -n "$ACTIVITY" >/dev/null 2>&1 || true
     sleep 2
     tap_resource "testTool"
   fi
