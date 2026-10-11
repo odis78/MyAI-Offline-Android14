@@ -60,6 +60,8 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_2
+          emulator-boot-timeout: 900
+          disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 4 -memory 4096
           script: |
             mkdir -p test-bridge/clean-baseline-evidence
