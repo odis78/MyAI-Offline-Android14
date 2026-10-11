@@ -85,7 +85,7 @@ adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-pre-accessibility.txt" 2
 adb shell dumpsys window windows > "$EVIDENCE/windows-pre-accessibility.txt" 2>&1 || true
 adb shell dumpsys activity processes > "$EVIDENCE/processes-pre-accessibility.txt" 2>&1 || true
 grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-pre-accessibility.txt" > "$EVIDENCE/anr-summary-pre-accessibility.txt" 2>/dev/null || true
-if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
+if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
   echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
   printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
   # The baseline already shows a system ANR before MyAI Accessibility is enabled.
@@ -123,7 +123,7 @@ if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_s
   adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" 2>&1 || true
   adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt" 2>&1 || true
   adb shell dumpsys window windows > "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" 2>&1 || true
-  if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt"; then
+  if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt"; then
     echo "WARNING: System/UI ANR persists after reboot; evidence will be retained."
     printf '%s\n' "System/UI ANR signature persists after reboot before Accessibility." > "$EVIDENCE/pre-accessibility-anr-persists-marker.txt"
   fi
@@ -204,8 +204,6 @@ dump_ui() {
   done
   fail "Could not create and pull Android UI hierarchy; last uiautomator output: $output"
 }
-dump_ui
-
 # Headless API 34 emulators can become overloaded and show a system/Settings
 # "isn't responding" dialog. Such a dialog overlays app controls; UIAutomator may
 # still expose the obscured controls, so tapping their coordinates would hit the
@@ -303,6 +301,11 @@ PY
 # dismisses the system dialog but leaves MainActivity dead/backgrounded, explicitly
 # relaunch it and re-check the hierarchy before declaring a UI regression.
 recover_unresponsive_dialog || fail "Android system ANR overlay could not be dismissed"
+
+# Only dump the UI after the ANR overlay check/recovery. UiAutomator can return
+# a null root while a system dialog owns the active window; dumping first makes
+# the recovery path unreachable on exactly the failures it is meant to handle.
+dump_ui
 
 ui_has_expected_controls() {
   python3 - "$EVIDENCE/window.xml" <<'PY'
