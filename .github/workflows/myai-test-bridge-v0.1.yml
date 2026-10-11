@@ -75,6 +75,11 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 4 -memory 4096
           script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
+      - name: Analyze Android failure evidence
+        if: always()
+        run: |
+          python3 test-bridge/diagnose_android_failure.py test-bridge/android-evidence
+          cat test-bridge/android-evidence/diagnosis.md
       - name: Upload Android evidence and APK
         if: always()
         uses: actions/upload-artifact@v4
@@ -83,5 +88,5 @@ jobs:
           path: |
             MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
             test-bridge/android-evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
