@@ -43,7 +43,7 @@ add("JAVA_CRASH", "В логах есть признак падения прил
     collect(re.compile(r"FATAL EXCEPTION.*com\.dmitry\.myai\.infinix|com\.dmitry\.myai\.infinix.*Fatal signal", re.I)))
 add("ACCESSIBILITY_BINDING", "Есть признаки ошибки подключения или падения Accessibility.",
     "Сверьте enabled_accessibility_services, dumpsys accessibility и Permission Denial; успешное SERVICE CONNECTED само по себе не является ошибкой.",
-    collect(re.compile(r"Permission Denial.*[Aa]ccessibility|Crashed services:\\{[^}\\n]*[Mm]y[Aa][Ii]|AccessibilityService.*(died|crash)", re.I)))
+    collect(re.compile(r"Permission Denial.*[Aa]ccessibility|Crashed services:\{[^}\n]*[Mm]y[Aa][Ii]|AccessibilityService.*(died|crash)", re.I)))
 system_anr = collect(re.compile(r"ANR in (?:system_server|com\.android\.(?:systemui|settings|phone|bluetooth|permissioncontroller)|android\.ext\.services)\\b|Application Not Responding: (?:system|System UI|Settings)", re.I))
 if system_anr:
     pre = [m for m in system_anr if "pre-accessibility" in m["file"] or "clean-baseline" in m["file"]]
