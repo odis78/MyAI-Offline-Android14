@@ -9,6 +9,19 @@ PKG="com.dmitry.myai.infinix"
 ACTIVITY="$PKG/.MainActivity"
 SERVICE="$PKG/com.dmitry.myai.infinix.bridge.MyAiAccessibilityService"
 
+# Prevent a stuck adb subcommand from hanging this smoke test indefinitely.
+# Reconnect/install operations get longer limits; ordinary probes stay bounded.
+adb() {
+  local limit=30 arg
+  for arg in "$@"; do
+    case "$arg" in
+      wait-for-device) limit=180 ;;
+      install) limit=90 ;;
+    esac
+  done
+  timeout --foreground "${limit}s" command adb "$@"
+}
+
 mkdir -p "$EVIDENCE"
 capture_failure_evidence() {
   local tag="${1:-failure}"
