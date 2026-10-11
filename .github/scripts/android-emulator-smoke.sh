@@ -116,6 +116,46 @@ dump_ui() {
 }
 dump_ui
 
+# Headless API 34 emulators can become overloaded and show a system/Settings
+# "isn't responding" dialog. Such a dialog overlays app controls; UIAutomator may
+# still expose the obscured controls, so tapping their coordinates would hit the
+# dialog instead. Dismiss it through the actual Wait button bounds before actions.
+recover_unresponsive_dialog() {
+  dump_ui || return 1
+  if ! grep -Eiq "(Settings|Process system|System UI|system_server).{0,80}isn't responding|isn't responding.{0,80}(Settings|Process system|System UI|system_server)" "$EVIDENCE/window.xml"; then
+    return 0
+  fi
+  local wait_bounds=""
+  wait_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET, re
+root=ET.parse(sys.argv[1]).getroot()
+for n in root.iter('node'):
+    text=(n.attrib.get('text','')+' '+n.attrib.get('content-desc','')).casefold()
+    if n.attrib.get('resource-id') == 'android:id/aerr_wait' or text.strip() == 'wait':
+        m=re.fullmatch(r'\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]',n.attrib.get('bounds',''))
+        if m:
+            x1,y1,x2,y2=map(int,m.groups())
+            print((x1+x2)//2, (y1+y2)//2)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)" || true
+  if [[ -n "$wait_bounds" ]]; then
+    read -r wx wy <<< "$wait_bounds"
+    echo "Unresponsive system dialog detected; tapping Wait at $wx,$wy"
+    adb shell input tap "$wx" "$wy" || true
+    sleep 4
+    adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
+    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+    sleep 3
+    dump_ui || return 1
+    return 0
+  fi
+  echo "Unresponsive dialog detected but Wait button was not found; saving hierarchy" >&2
+  cp "$EVIDENCE/window.xml" "$EVIDENCE/unresponsive-dialog.xml" || true
+  return 1
+}
+
 # The headless Android emulator can occasionally show a system Settings ANR dialog
 # after accessibility is toggled. Dismiss it using the actual UI bounds, then
 # relaunch our activity before asserting app UI.
@@ -206,6 +246,7 @@ fi
 tap_resource() {
   local resource_id="$1"
   local bounds=""
+  recover_unresponsive_dialog || fail "Could not recover from emulator unresponsive dialog before tapping $resource_id"
   # Controls are inside the upper controlScroll. Earlier test actions can leave
   # later buttons below the visible viewport, so scroll that container until
   # the requested resource ID appears instead of failing on a valid off-screen node.
@@ -258,8 +299,26 @@ cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
+# The Home tool legitimately backgrounds MainActivity. First dismiss any
+# emulator ANR overlay, then tap the control and poll for its result. If an ANR
+# overlay raced with the tap, recover it and retry the tap once.
+recover_unresponsive_dialog || fail "Could not recover from emulator dialog before tool protocol test"
 tap_resource "testTool"
-adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT home: OK dispatched' || fail "Tool protocol home command did not report success"
+home_ok=0
+for attempt in $(seq 1 12); do
+  if adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT home: OK dispatched'; then
+    home_ok=1
+    break
+  fi
+  if recover_unresponsive_dialog; then
+    # If the dialog had intercepted the previous tap, bring the app back and retry.
+    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+    sleep 2
+    tap_resource "testTool"
+  fi
+  sleep 2
+done
+[[ "$home_ok" -eq 1 ]] || fail "Tool protocol home command did not report success after dialog recovery/retry"
 dump_ui || fail "UI dump failed after tool protocol test"
 cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-tool.xml"
 
