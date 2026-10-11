@@ -17,12 +17,28 @@ adb() {
     case "$arg" in
       wait-for-device) limit=180 ;;
       install) limit=90 ;;
+      bugreport) limit=180 ;;
     esac
   done
   timeout --foreground "${limit}s" adb "$@"
 }
 
 mkdir -p "$EVIDENCE"
+
+# Best-effort ANR trace collection. /data/anr may be unreadable to shell on
+# some Android images, so preserve permission/error output and request a
+# bugreport, which may contain system_server and app thread stacks.
+capture_anr_traces() {
+  local tag="${1:-failure}"
+  mkdir -p "$EVIDENCE/anr-traces-$tag"
+  adb shell ls -la /data/anr > "$EVIDENCE/anr-files-$tag.txt" 2>&1 || true
+  adb pull /data/anr "$EVIDENCE/anr-traces-$tag" > "$EVIDENCE/anr-pull-$tag.txt" 2>&1 || true
+  adb bugreport "$EVIDENCE/bugreport-$tag.zip" > "$EVIDENCE/bugreport-$tag.txt" 2>&1 || true
+  if [[ ! -s "$EVIDENCE/bugreport-$tag.zip" ]]; then
+    rm -f "$EVIDENCE/bugreport-$tag.zip"
+  fi
+}
+
 capture_failure_evidence() {
   local tag="${1:-failure}"
   # Preserve device connectivity evidence before recovery or restarts can overwrite it.
@@ -37,6 +53,7 @@ capture_failure_evidence() {
   adb shell dumpsys input > "$EVIDENCE/input-${tag}.txt" 2>&1 || true
   adb shell ps -A -o PID,PPID,NAME,ARGS > "$EVIDENCE/ps-${tag}.txt" 2>&1 || adb shell ps -A > "$EVIDENCE/ps-${tag}.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/screenshot-${tag}.png" 2>/dev/null || true
+  capture_anr_traces "$tag"
   grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-${tag}.txt" > "$EVIDENCE/anr-summary-${tag}.txt" 2>/dev/null || true
 }
 fail() {
@@ -100,7 +117,9 @@ adb shell dumpsys activity processes > "$EVIDENCE/processes-pre-accessibility.tx
 grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-pre-accessibility.txt" > "$EVIDENCE/anr-summary-pre-accessibility.txt" 2>/dev/null || true
 if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
   echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
-  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
+  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement.
+  # Capture thread traces before reboot can remove the original ANR evidence.
+  capture_anr_traces pre-accessibility" > "$EVIDENCE/pre-accessibility-anr-marker.txt"
   # The baseline already shows a system ANR before MyAI Accessibility is enabled.
   # Reboot once to avoid testing the agent on a known-unhealthy framework state.
   echo "Rebooting emulator once after pre-Accessibility system ANR"
