@@ -169,11 +169,13 @@ recover_unresponsive_dialog() {
 }
 
 # Recover before checking visible controls; the ANR window may cover the app while
-# UIAutomator continues to return the underlying activity hierarchy.
+# UIAutomator continues to return the underlying activity hierarchy. If recovery
+# dismisses the system dialog but leaves MainActivity dead/backgrounded, explicitly
+# relaunch it and re-check the hierarchy before declaring a UI regression.
 recover_unresponsive_dialog || fail "Android system ANR overlay could not be dismissed"
-dump_ui
 
-if ! python3 - "$EVIDENCE/window.xml" <<'PY'
+ui_has_expected_controls() {
+  python3 - "$EVIDENCE/window.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 texts = [node.attrib.get("text", "").casefold() for node in root.iter("node")]
@@ -192,9 +194,24 @@ if missing:
     print("Missing UI text after Unicode case normalization: " + ", ".join(missing), file=sys.stderr)
     raise SystemExit(1)
 PY
-then
-  fail "Expected UI element/text not found in hierarchy (case-insensitive check)"
-fi
+}
+
+ui_ready=0
+for attempt in $(seq 1 3); do
+  dump_ui || true
+  if ui_has_expected_controls; then
+    ui_ready=1
+    break
+  fi
+  if [[ "$attempt" -lt 3 ]]; then
+    echo "Expected controls are not visible after recovery; restarting MainActivity (attempt $attempt)"
+    adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+    sleep 2
+    adb shell am start -W -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-recovery-relaunch-$attempt.txt" || true
+    sleep 8
+  fi
+done
+[[ "$ui_ready" -eq 1 ]] || fail "Expected UI element/text not found after ANR recovery and activity relaunch attempts"
 
 # Confirm the service itself connected; UI status is also refreshed live by MainActivity.
 connected=0
