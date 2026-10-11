@@ -88,6 +88,27 @@ grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason
 if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
   echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
   printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
+  # The baseline already shows a system ANR before MyAI Accessibility is enabled.
+  # Reboot once to avoid testing the agent on a known-unhealthy framework state.
+  echo "Rebooting emulator once after pre-Accessibility system ANR"
+  adb reboot || fail "Could not reboot emulator after pre-Accessibility system ANR"
+  adb wait-for-device || fail "Emulator did not reconnect after pre-Accessibility ANR reboot"
+  rebooted=0
+  for attempt in $(seq 1 90); do
+    value="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+    if [[ "$value" == "1" ]]; then rebooted=1; break; fi
+    sleep 5
+  done
+  [[ "$rebooted" -eq 1 ]] || fail "Emulator did not finish rebooting after pre-Accessibility system ANR"
+  adb shell am start -n "$ACTIVITY" > "$EVIDENCE/activity-post-anr-reboot.txt" 2>&1 || fail "Could not relaunch MainActivity after baseline ANR reboot"
+  sleep 5
+  adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" 2>&1 || true
+  adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt" 2>&1 || true
+  adb shell dumpsys window windows > "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" 2>&1 || true
+  if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt"; then
+    echo "WARNING: System/UI ANR persists after reboot; evidence will be retained."
+    printf '%s\n' "System/UI ANR signature persists after reboot before Accessibility." > "$EVIDENCE/pre-accessibility-anr-persists-marker.txt"
+  fi
 fi
 
 service_discovered=0
