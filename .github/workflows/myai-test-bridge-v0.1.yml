@@ -107,15 +107,17 @@ jobs:
       - name: Build debug APK
         working-directory: MyAI_Infinix_v0.1.0_ALPHA
         run: gradle :app:assembleDebug --stacktrace --no-daemon
-      - name: Launch app on Android emulator
+      - name: Launch app on Android emulator (API 35 stability comparison)
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          # The API 34 / Pixel 2 clean baseline independently showed System UI ANRs.
+          # Compare against a newer API 35 / Pixel 6 AVD with animations and cameras disabled.
+          api-level: 35
           arch: x86_64
-          profile: pixel_2
+          profile: pixel_6
           emulator-boot-timeout: 900
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
       - name: Analyze Android failure evidence
         if: always()
