@@ -44,6 +44,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  android-clean-emulator-baseline:
+    name: Clean Android emulator baseline (no MyAI install)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v4
+      - name: Capture clean emulator baseline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 4 -memory 4096
+          script: |
+            mkdir -p test-bridge/clean-baseline-evidence
+            adb logcat -c >/dev/null 2>&1 || true
+            echo "Clean AVD baseline: no MyAI APK is installed or launched in this job."
+            sleep 45
+            adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > test-bridge/clean-baseline-evidence/logcat-clean-baseline.txt 2>&1 || true
+            adb shell dumpsys activity lastanr > test-bridge/clean-baseline-evidence/lastanr-clean-baseline.txt 2>&1 || true
+            adb shell dumpsys window windows > test-bridge/clean-baseline-evidence/windows-clean-baseline.txt 2>&1 || true
+            adb shell dumpsys activity processes > test-bridge/clean-baseline-evidence/processes-clean-baseline.txt 2>&1 || true
+            if grep -Eiq 'ANR in (com\.android\.systemui|com\.android\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' test-bridge/clean-baseline-evidence/logcat-clean-baseline.txt test-bridge/clean-baseline-evidence/windows-clean-baseline.txt test-bridge/clean-baseline-evidence/lastanr-clean-baseline.txt; then
+              echo "System/UI ANR observed on clean emulator without MyAI installed." | tee test-bridge/clean-baseline-evidence/BASELINE_ANR_FOUND.txt
+            else
+              echo "No known System/UI ANR signature observed during clean 45-second baseline." | tee test-bridge/clean-baseline-evidence/BASELINE_NO_ANR_SIGNATURE.txt
+            fi
+      - name: Upload clean emulator baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-test-bridge-clean-emulator-baseline
+          path: test-bridge/clean-baseline-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   android-apk-smoke:
     name: Build and launch Android debug APK
     runs-on: ubuntu-22.04
