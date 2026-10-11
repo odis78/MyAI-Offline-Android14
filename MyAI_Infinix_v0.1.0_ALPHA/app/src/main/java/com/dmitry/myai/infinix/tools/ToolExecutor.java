@@ -42,6 +42,10 @@ public final class ToolExecutor {
                     MyAiAccessibilityService.scrollDown();
                     result = ToolResult.ok("scroll_down", "scroll dispatched", "{}");
                     break;
+                case "scroll_up":
+                    MyAiAccessibilityService.scrollUp();
+                    result = ToolResult.ok("scroll_up", "scroll dispatched", "{}");
+                    break;
                 case "back":
                     MyAiAccessibilityService.back();
                     result = ToolResult.ok("back", "dispatched", "{}");
