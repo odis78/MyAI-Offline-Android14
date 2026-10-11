@@ -10,11 +10,22 @@ ACTIVITY="$PKG/.MainActivity"
 SERVICE="$PKG/com.dmitry.myai.infinix.bridge.MyAiAccessibilityService"
 
 mkdir -p "$EVIDENCE"
+capture_failure_evidence() {
+  local tag="${1:-failure}"
+  # Preserve attribution before recovery or restarts can overwrite the evidence.
+  adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-${tag}.txt" 2>&1 || true
+  adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-${tag}.txt" 2>&1 || true
+  adb shell dumpsys activity processes > "$EVIDENCE/processes-${tag}.txt" 2>&1 || true
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-${tag}.txt" 2>&1 || true
+  adb shell dumpsys window windows > "$EVIDENCE/windows-${tag}.txt" 2>&1 || true
+  adb shell dumpsys input > "$EVIDENCE/input-${tag}.txt" 2>&1 || true
+  adb shell ps -A -o PID,PPID,NAME,ARGS > "$EVIDENCE/ps-${tag}.txt" 2>&1 || adb shell ps -A > "$EVIDENCE/ps-${tag}.txt" 2>&1 || true
+  adb exec-out screencap -p > "$EVIDENCE/screenshot-${tag}.png" 2>/dev/null || true
+  grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-${tag}.txt" > "$EVIDENCE/anr-summary-${tag}.txt" 2>/dev/null || true
+}
 fail() {
   echo "FAIL: $*" >&2
-  adb logcat -d -t 8000 > "$EVIDENCE/logcat-failure.txt" 2>/dev/null || true
-  adb shell dumpsys activity activities > "$EVIDENCE/activities-failure.txt" 2>/dev/null || true
-  adb exec-out screencap -p > "$EVIDENCE/screenshot-failure.png" 2>/dev/null || true
+  capture_failure_evidence failure
   exit 1
 }
 
@@ -139,6 +150,8 @@ recover_unresponsive_dialog() {
   fi
 
   echo "Android ANR overlay detected from WindowManager; focused-window evidence:"
+  # Save diagnostics before any key events or relaunch attempts.
+  capture_failure_evidence anr
   printf '%s\n' "$focused" | tee "$EVIDENCE/anr-focused-window.txt"
   adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
