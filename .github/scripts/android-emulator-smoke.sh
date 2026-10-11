@@ -149,8 +149,13 @@ fi
 dump_ui() {
   local output=""
   for attempt in $(seq 1 5); do
+    # Remove any previous hierarchy first: uiautomator can fail to dump while
+    # the remote file from an earlier ANR dialog still exists. Without this,
+    # adb pull may silently reuse stale XML and falsely report every app control missing.
+    adb shell rm -f /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
     output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
-    if adb shell test -s /data/local/tmp/myai-window.xml >/dev/null 2>&1; then
+    if printf '%s' "$output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
+       adb shell test -s /data/local/tmp/myai-window.xml >/dev/null 2>&1; then
       if adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1; then
         return 0
       fi
@@ -197,8 +202,10 @@ recover_unresponsive_dialog() {
   dialog_recovered=1
   wait_tapped=0
   for tap_attempt in $(seq 1 3); do
+    adb shell rm -f /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 || true
     adb shell uiautomator dump /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 || true
-    if adb pull /data/local/tmp/myai-anr-dialog.xml "$EVIDENCE/window-anr-dialog.xml" >/dev/null 2>&1; then
+    if adb shell test -s /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 &&
+       adb pull /data/local/tmp/myai-anr-dialog.xml "$EVIDENCE/window-anr-dialog.xml" >/dev/null 2>&1; then
       wait_bounds="$(python3 - "$EVIDENCE/window-anr-dialog.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET, re
 try:
