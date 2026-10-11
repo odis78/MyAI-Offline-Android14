@@ -271,6 +271,7 @@ expected = [
     "тест: прочитать экран",
     "тест: tool protocol",
     "тест: прокрутка вниз",
+    "тест: прокрутка вверх",
     "журнал действий",
 ]
 missing = [item for item in expected if item.casefold() not in joined]
@@ -424,6 +425,9 @@ cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
 # UI labels or results can vary; require the app to remain foreground and capture the output.
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
+
+tap_resource "testScrollUp"
+adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT scroll_up: OK scroll dispatched' || fail "scroll_up tool did not report success"
 
 # The Home tool legitimately backgrounds MainActivity. First dismiss any
 # emulator ANR overlay, then tap the control and poll for its result. If an ANR
