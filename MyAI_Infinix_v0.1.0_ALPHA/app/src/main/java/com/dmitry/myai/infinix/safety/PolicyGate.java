@@ -24,7 +24,7 @@ public final class PolicyGate {
         return tool.equals("get_screen_state") || tool.equals("find_node")
             || tool.equals("click") || tool.equals("type_text")
             || tool.equals("wait_for") || tool.equals("open_app")
-            || tool.equals("scroll_down") || tool.equals("back")
+            || tool.equals("scroll_down") || tool.equals("scroll_up") || tool.equals("back")
             || tool.equals("home") || tool.equals("recents");
     }
 }
