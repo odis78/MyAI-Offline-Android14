@@ -73,7 +73,7 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 2 -memory 3072
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 4 -memory 4096
           script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
       - name: Upload Android evidence and APK
         if: always()
