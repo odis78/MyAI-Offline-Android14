@@ -80,4 +80,8 @@ grep -Fq 'class VerificationEngine' "$R/app/src/main/java/com/dmitry/myai/infini
 grep -Fq 'get_screen_state' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'type_text' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'recents' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
+grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
+grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/safety/PolicyGate.java"
+grep -Fq 'new JSONObject(json)' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolProtocol.java"
+grep -Fq 'node.recycle()' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'dispatchJson' "$R/app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java"

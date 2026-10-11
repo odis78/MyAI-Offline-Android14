@@ -1,0 +1,87 @@
+name: MyAI Test Bridge v0.1
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - myai-test-bridge-v0.1
+    paths:
+      - 'test-bridge/**'
+      - '.github/workflows/myai-test-bridge-v0.1.yml'
+      - '.github/scripts/**'
+      - 'MyAI_Infinix_v0.1.0_ALPHA/**'
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-tests:
+    name: Browser simulator regression tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: test-bridge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: test-bridge/package.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser tests
+        run: npm test
+      - name: Upload browser report and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-test-bridge-browser-report
+          path: |
+            test-bridge/playwright-report/
+            test-bridge/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-apk-smoke:
+    name: Build and launch Android debug APK
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Run source sanity checks
+        run: bash MyAI_Infinix_v0.1.0_ALPHA/sanity_check.sh
+      - name: Build debug APK
+        working-directory: MyAI_Infinix_v0.1.0_ALPHA
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Launch app on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 4 -memory 4096
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
+      - name: Upload Android evidence and APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-test-bridge-android-smoke
+          path: |
+            MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+            test-bridge/android-evidence/
+          if-no-files-found: error
+          retention-days: 14
