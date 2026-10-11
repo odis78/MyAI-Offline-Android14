@@ -61,6 +61,33 @@ public class MyAiAccessibilityService extends AccessibilityService {
             .addStroke(new GestureDescription.StrokeDescription(p,0,350)).build();
         if(!s.dispatchGesture(g,null,null)) throw new IllegalStateException("Scroll gesture could not be dispatched");
     }
+    public static void scrollUp(){
+        MyAiAccessibilityService s=require();
+        AccessibilityNodeInfo root=s.getRootInActiveWindow();
+        boolean scrolled=false;
+        List<AccessibilityNodeInfo> candidates=new ArrayList<>();
+        if(root!=null){
+            try{
+                collectScrollable(root,candidates,0);
+                candidates.sort(Comparator.comparingLong(MyAiAccessibilityService::area).reversed());
+                for(AccessibilityNodeInfo node:candidates){
+                    if(node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)){scrolled=true;break;}
+                }
+            }finally{
+                for(AccessibilityNodeInfo node:candidates) if(node!=root) node.recycle();
+                root.recycle();
+            }
+        }
+        if(scrolled)return;
+        DisplayMetrics dm=s.getResources().getDisplayMetrics();
+        int x=Math.max(1,dm.widthPixels/2);
+        int startY=Math.max(1,(int)(dm.heightPixels*0.28f));
+        int endY=Math.max(1,(int)(dm.heightPixels*0.78f));
+        Path p=new Path(); p.moveTo(x,startY); p.lineTo(x,endY);
+        GestureDescription g=new GestureDescription.Builder()
+            .addStroke(new GestureDescription.StrokeDescription(p,0,350)).build();
+        if(!s.dispatchGesture(g,null,null)) throw new IllegalStateException("Scroll-up gesture could not be dispatched");
+    }
     private static void collectScrollable(AccessibilityNodeInfo node,List<AccessibilityNodeInfo> out,int depth){
         if(node==null||depth>30)return;
         if(node.isScrollable())out.add(node);
