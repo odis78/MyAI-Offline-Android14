@@ -120,72 +120,58 @@ dump_ui
 # "isn't responding" dialog. Such a dialog overlays app controls; UIAutomator may
 # still expose the obscured controls, so tapping their coordinates would hit the
 # dialog instead. Dismiss it through the actual Wait button bounds before actions.
+# Android 14 headless emulator sometimes raises an ANR dialog for system_server.
+# UIAutomator can dump the obscured app tree instead of the dialog, so detect the
+# overlay from WindowManager's focused-window state rather than only window.xml.
+anr_window_visible() {
+  adb shell dumpsys window windows 2>/dev/null |
+    grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding|Application Not Responding: system'
+}
+
 recover_unresponsive_dialog() {
-  # Re-dump immediately before input because the emulator ANR window can cover app controls.
   dialog_recovered=0
-  dump_ui || return 1
-  if ! grep -Eiq "(Settings|Process system|System UI|system_server).{0,80}isn't responding|isn't responding.{0,80}(Settings|Process system|System UI|system_server)" "$EVIDENCE/window.xml"; then
-    return 0
+  local focused=""
+  focused="$(adb shell dumpsys window windows 2>/dev/null | grep -E 'mCurrentFocus|mFocusedWindow' | tail -n 4 || true)"
+  if ! printf '%s\n' "$focused" | grep -Eiq 'Application Not Responding: (system|Settings|System UI)|mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding'; then
+    # A dialog can appear between the focus snapshot and this check. The app
+    # hierarchy alone is not authoritative for overlays, so query WindowManager again.
+    anr_window_visible || return 0
   fi
-  local wait_bounds=""
-  wait_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
-import sys, xml.etree.ElementTree as ET, re
-root=ET.parse(sys.argv[1]).getroot()
-for n in root.iter('node'):
-    text=(n.attrib.get('text','')+' '+n.attrib.get('content-desc','')).casefold()
-    if n.attrib.get('resource-id') == 'android:id/aerr_wait' or text.strip() == 'wait':
-        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2=map(int,m.groups())
-            print((x1+x2)//2, (y1+y2)//2)
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
-)" || true
-  if [[ -n "$wait_bounds" ]]; then
-    read -r wx wy <<< "$wait_bounds"
-    echo "Unresponsive system dialog detected; tapping Wait at $wx,$wy"
-    adb shell input tap "$wx" "$wy" || true
-    dialog_recovered=1
-    sleep 4
-    adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
-    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
-    sleep 3
-    dump_ui || return 1
-    return 0
-  fi
-  echo "Unresponsive dialog detected but Wait button was not found; saving hierarchy" >&2
-  cp "$EVIDENCE/window.xml" "$EVIDENCE/unresponsive-dialog.xml" || true
+
+  echo "Android ANR overlay detected from WindowManager; focused-window evidence:"
+  printf '%s\n' "$focused" | tee "$EVIDENCE/anr-focused-window.txt"
+  adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
+  adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
+
+  # On the stock Android ANR dialog, Wait is the default action. ENTER chooses
+  # that action without force-stopping Settings/system_server or blindly tapping
+  # coordinates from the obscured app hierarchy.
+  adb shell input keyevent KEYCODE_ENTER >/dev/null 2>&1 || true
+  dialog_recovered=1
+  for attempt in $(seq 1 12); do
+    sleep 2
+    if ! anr_window_visible; then
+      echo "ANR overlay dismissed; waiting for system services to settle"
+      sleep 4
+      adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
+      sleep 3
+      dump_ui || return 1
+      return 0
+    fi
+    # If ENTER did not select Wait, BACK dismisses the dialog on some API 34 images.
+    if [[ "$attempt" -eq 4 ]]; then
+      adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    fi
+  done
+  echo "ANR overlay remains focused after recovery attempts" >&2
+  adb shell dumpsys accessibility > "$EVIDENCE/anr-accessibility.txt" 2>&1 || true
   return 1
 }
 
-# The headless Android emulator can occasionally show a system Settings ANR dialog
-# after accessibility is toggled. Dismiss it using the actual UI bounds, then
-# relaunch our activity before asserting app UI.
-if grep -Fq "Settings isn't responding" "$EVIDENCE/window.xml"; then
-  echo "System Settings ANR dialog detected; choosing Wait and restoring app foreground"
-  wait_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
-import sys, xml.etree.ElementTree as ET, re
-root=ET.parse(sys.argv[1]).getroot()
-for n in root.iter('node'):
-    if n.attrib.get('resource-id') == 'android:id/aerr_wait':
-        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2=map(int,m.groups())
-            print((x1+x2)//2, (y1+y2)//2)
-            break
-PY
-)"
-  if [[ -n "$wait_bounds" ]]; then
-    read -r wx wy <<< "$wait_bounds"
-    adb shell input tap "$wx" "$wy" || true
-    sleep 3
-  fi
-  adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
-  adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
-  sleep 5
-  dump_ui
-fi
+# Recover before checking visible controls; the ANR window may cover the app while
+# UIAutomator continues to return the underlying activity hierarchy.
+recover_unresponsive_dialog || fail "Android system ANR overlay could not be dismissed"
+dump_ui
 
 if ! python3 - "$EVIDENCE/window.xml" <<'PY'
 import sys, xml.etree.ElementTree as ET
@@ -217,13 +203,8 @@ for attempt in $(seq 1 30); do
     connected=1
     break
   fi
-  # Recover if the emulator overlays the app with a Settings ANR dialog.
-  dump_ui || true
-  if grep -Fq "Settings isn't responding" "$EVIDENCE/window.xml"; then
-    adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
-    adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
-    adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
-  fi
+  # Recover using WindowManager focus; UIAutomator may only return the covered app tree.
+  recover_unresponsive_dialog || true
   sleep 2
 done
 if [[ "$connected" -ne 1 ]]; then
