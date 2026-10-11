@@ -46,7 +46,26 @@ done
 [[ "$booted" -eq 1 ]] || fail "Android emulator did not finish booting within 7.5 minutes"
 
 echo "Installing APK"
-adb install -r "$APK" || fail "APK installation failed"
+# API 34 CI images can temporarily stall PackageManager integrity verification
+# while System UI is recovering. Keep the original failure evidence, wait for
+# the package manager, and retry a bounded number of times before failing.
+install_ok=0
+for attempt in $(seq 1 3); do
+  install_output="$(adb install -r "$APK" 2>&1)" && install_status=0 || install_status=$?
+  printf '%s\n' "$install_output" | tee "$EVIDENCE/apk-install-attempt-${attempt}.txt"
+  if [[ "$install_status" -eq 0 ]]; then
+    install_ok=1
+    break
+  fi
+  if [[ "$attempt" -lt 3 ]]; then
+    echo "APK install attempt $attempt failed (exit $install_status); waiting for PackageManager and retrying"
+    adb shell dumpsys package > "$EVIDENCE/package-manager-after-install-failure-${attempt}.txt" 2>&1 || true
+    adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-after-install-failure-${attempt}.txt" 2>&1 || true
+    sleep $((attempt * 10))
+    adb wait-for-device || true
+  fi
+done
+[[ "$install_ok" -eq 1 ]] || fail "APK installation failed after 3 attempts"
 
 # Start the app before changing secure accessibility settings. On fresh API
 # emulator images PackageManager/AccessibilityManager can lag behind adb install;
