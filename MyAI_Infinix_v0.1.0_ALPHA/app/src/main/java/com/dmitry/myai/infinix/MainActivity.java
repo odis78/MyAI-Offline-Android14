@@ -8,6 +8,8 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import com.dmitry.myai.infinix.agent.AgentContracts;
 import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 
@@ -15,6 +17,8 @@ public class MainActivity extends Activity {
     TextView status,log;
     AgentContracts.ToolAgent agent;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
+    // Accessibility tree traversal and tool waits must not block Android's UI thread.
+    private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
     private boolean activityResumed = false;
     private final Runnable statusUpdater = new Runnable() {
         @Override public void run() {
@@ -35,18 +39,31 @@ public class MainActivity extends Activity {
         findViewById(R.id.testTool).setOnClickListener(v->runTool("{\"tool\":\"home\",\"args\":{}}"));
         updateBridgeStatus();
     }
-    void run(Runnable r){try{r.run();append("TEST dispatched");}catch(Exception e){append("ERROR: "+e.getMessage());}}
+    void run(Runnable r){
+        commandExecutor.execute(() -> {
+            try { r.run(); append("TEST dispatched"); }
+            catch(Exception e){ append("ERROR: "+e.getMessage()); }
+        });
+    }
     void runTool(String json){
-        var r=agent.dispatchJson(json);
-        String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
-        append(result);
-        android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
-        if(!r.dataJson.equals("{}")) append(r.dataJson);
+        commandExecutor.execute(() -> {
+            try {
+                var r=agent.dispatchJson(json);
+                String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
+                append(result);
+                android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
+                if(!r.dataJson.equals("{}")) append(r.dataJson);
+            } catch(Exception e) {
+                String message = "TOOL ERROR: " + (e.getMessage()==null ? e.getClass().getSimpleName() : e.getMessage());
+                append(message);
+                android.util.Log.e("MyAI-Infinix", message, e);
+            }
+        });
     }
     private void updateBridgeStatus(){
         if (status != null) status.setText(MyAiAccessibilityService.isConnected()?"Control Bridge: ПОДКЛЮЧЕН":"Control Bridge: НЕ ПОДКЛЮЧЕН");
     }
-    void append(String s){log.append(s+"\n");log.post(()->((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN));}
+    void append(String s){runOnUiThread(() -> { if(log==null)return; log.append(s+"\\n"); log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN)); });}
     @Override protected void onResume(){
         super.onResume();
         activityResumed = true;
@@ -57,5 +74,10 @@ public class MainActivity extends Activity {
         activityResumed = false;
         statusHandler.removeCallbacks(statusUpdater);
         super.onPause();
+    }
+    @Override protected void onDestroy(){
+        statusHandler.removeCallbacks(statusUpdater);
+        commandExecutor.shutdownNow();
+        super.onDestroy();
     }
 }
