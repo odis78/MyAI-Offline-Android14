@@ -121,6 +121,7 @@ dump_ui
 # still expose the obscured controls, so tapping their coordinates would hit the
 # dialog instead. Dismiss it through the actual Wait button bounds before actions.
 recover_unresponsive_dialog() {
+  # Re-dump immediately before input because the emulator ANR window can cover app controls.
   dialog_recovered=0
   dump_ui || return 1
   if ! grep -Eiq "(Settings|Process system|System UI|system_server).{0,80}isn't responding|isn't responding.{0,80}(Settings|Process system|System UI|system_server)" "$EVIDENCE/window.xml"; then
