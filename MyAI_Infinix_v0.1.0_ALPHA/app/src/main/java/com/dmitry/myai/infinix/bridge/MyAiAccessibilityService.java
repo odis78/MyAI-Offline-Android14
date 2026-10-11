@@ -6,18 +6,51 @@ import android.graphics.Path;
 import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.content.Intent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import android.view.accessibility.AccessibilityEvent;
 
 public class MyAiAccessibilityService extends AccessibilityService {
+    public interface ConnectionListener { void onConnectionChanged(boolean connected); }
     private static volatile MyAiAccessibilityService instance;
+    private static final List<ConnectionListener> listeners = new CopyOnWriteArrayList<>();
+    private static final AtomicInteger connectCount = new AtomicInteger();
     public static boolean isConnected(){ return instance != null; }
-    @Override public void onServiceConnected(){ instance=this; log("SERVICE CONNECTED — INFINIX ALPHA"); }
+    public static void addConnectionListener(ConnectionListener listener){
+        listeners.add(listener);
+        listener.onConnectionChanged(instance != null);
+    }
+    public static void removeConnectionListener(ConnectionListener listener){ listeners.remove(listener); }
+    private static void publish(){
+        boolean connected = instance != null;
+        for (ConnectionListener listener : listeners) listener.onConnectionChanged(connected);
+    }
+    @Override public void onServiceConnected(){
+        instance=this;
+        int count = connectCount.incrementAndGet();
+        log(count == 1
+                ? "SERVICE CONNECTED — INFINIX ALPHA"
+                : "SERVICE REBOUND — INFINIX ALPHA count=" + count);
+        publish();
+    }
     @Override public void onAccessibilityEvent(AccessibilityEvent e){}
     @Override public void onInterrupt(){ log("SERVICE INTERRUPTED"); }
-    @Override public void onDestroy(){ if(instance==this) instance=null; super.onDestroy(); }
+    @Override public boolean onUnbind(Intent intent){
+        if(instance==this) instance=null;
+        log("SERVICE UNBOUND");
+        publish();
+        return super.onUnbind(intent);
+    }
+    @Override public void onDestroy(){
+        if(instance==this) instance=null;
+        log("SERVICE DESTROYED");
+        publish();
+        super.onDestroy();
+    }
     public static AccessibilityNodeInfo root(){ return instance==null?null:instance.getRootInActiveWindow(); }
     public static AccessibilityNodeInfo focusedInput(){
         if(instance==null) return null;

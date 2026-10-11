@@ -19,14 +19,9 @@ public class MainActivity extends Activity {
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     // Accessibility tree traversal and tool waits must not block Android's UI thread.
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
-    private boolean activityResumed = false;
-    private final Runnable statusUpdater = new Runnable() {
-        @Override public void run() {
-            if (!activityResumed) return;
-            updateBridgeStatus();
-            statusHandler.postDelayed(this, 1000);
-        }
-    };
+    private boolean destroyed = false;
+    private final MyAiAccessibilityService.ConnectionListener connectionListener =
+            connected -> statusHandler.post(this::updateBridgeStatus);
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b); setContentView(R.layout.activity_main);
@@ -38,6 +33,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.testScrollUp).setOnClickListener(v->runTool("{\"tool\":\"scroll_up\",\"args\":{}}"));
         findViewById(R.id.testScreen).setOnClickListener(v->runTool("{\"tool\":\"get_screen_state\",\"args\":{}}"));
         findViewById(R.id.testTool).setOnClickListener(v->runTool("{\"tool\":\"home\",\"args\":{}}"));
+        MyAiAccessibilityService.addConnectionListener(connectionListener);
         updateBridgeStatus();
     }
     void run(Runnable r){
@@ -62,22 +58,25 @@ public class MainActivity extends Activity {
         });
     }
     private void updateBridgeStatus(){
-        if (status != null) status.setText(MyAiAccessibilityService.isConnected()?"Control Bridge: ПОДКЛЮЧЕН":"Control Bridge: НЕ ПОДКЛЮЧЕН");
+        if (destroyed || status == null) return;
+        String text = MyAiAccessibilityService.isConnected()
+                ? "Control Bridge: ПОДКЛЮЧЕН"
+                : "Control Bridge: НЕ ПОДКЛЮЧЕН";
+        status.setText(text);
+        status.setContentDescription(text);
     }
     void append(String s){runOnUiThread(() -> { if(log==null)return; log.append(s+"\n"); log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN)); });}
     @Override protected void onResume(){
         super.onResume();
-        activityResumed = true;
-        statusHandler.removeCallbacks(statusUpdater);
-        statusUpdater.run();
+        updateBridgeStatus();
     }
     @Override protected void onPause(){
-        activityResumed = false;
-        statusHandler.removeCallbacks(statusUpdater);
+        updateBridgeStatus();
         super.onPause();
     }
     @Override protected void onDestroy(){
-        statusHandler.removeCallbacks(statusUpdater);
+        destroyed = true;
+        MyAiAccessibilityService.removeConnectionListener(connectionListener);
         commandExecutor.shutdownNow();
         super.onDestroy();
     }

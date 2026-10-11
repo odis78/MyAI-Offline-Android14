@@ -245,7 +245,7 @@ dump_ui() {
 # overlay from WindowManager's focused-window state rather than only window.xml.
 anr_window_visible() {
   adb shell dumpsys window windows 2>/dev/null |
-    grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding|Application Not Responding: system'
+    grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding'
 }
 
 recover_unresponsive_dialog() {
@@ -387,7 +387,7 @@ for attempt in $(seq 1 30); do
     break
   fi
   # Recover using WindowManager focus; UIAutomator may only return the covered app tree.
-  recover_unresponsive_dialog || true
+  recover_unresponsive_dialog || fail "Android system ANR recovery failed while waiting for Accessibility connection"
   sleep 2
 done
 if [[ "$connected" -ne 1 ]]; then
@@ -407,6 +407,41 @@ if [[ "$connected" -ne 1 ]]; then
   grep -i -E 'myai.infinix|MyAI-Infinix|AccessibilityManager|AccessibilityService|Permission Denial|FATAL EXCEPTION|Exception' "$EVIDENCE/logcat-accessibility-failure.txt" | tail -n 160 || true
   fail "Accessibility Bridge service did not emit SERVICE CONNECTED (diagnostics saved)"
 fi
+
+
+# Require the status node itself to show the connected state; action logs can quote stale text.
+status_ok=0
+for attempt in $(seq 1 15); do
+  recover_unresponsive_dialog || fail "Android system ANR recovery failed while waiting for connected Bridge status"
+  adb shell rm -f /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
+  dump_output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
+  if printf '%s' "$dump_output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
+     adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1 &&
+     python3 - "$EVIDENCE/window.xml" <<'PY'
+import sys, re
+xml = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+connected = (
+    r'text="Control Bridge: ПОДКЛЮЧЕН"[^>]*resource-id="[^"]*:id/status"',
+    r'resource-id="[^"]*:id/status"[^>]*text="Control Bridge: ПОДКЛЮЧЕН"',
+)
+disconnected = (
+    r'text="Control Bridge: НЕ ПОДКЛЮЧЕН"[^>]*resource-id="[^"]*:id/status"',
+    r'resource-id="[^"]*:id/status"[^>]*text="Control Bridge: НЕ ПОДКЛЮЧЕН"',
+)
+if any(re.search(p, xml) for p in disconnected):
+    raise SystemExit(1)
+if any(re.search(p, xml) for p in connected):
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+  then
+    status_ok=1
+    break
+  fi
+  echo "Control Bridge label is not connected yet (attempt $attempt)"
+  sleep 1
+done
+[[ "$status_ok" -eq 1 ]] || fail "Control Bridge status stayed disconnected after SERVICE CONNECTED"
 
 # Exercise the in-app tool protocol and screen-state command by tapping controls
 # using their actual resource IDs and bounds from the Android accessibility tree.
