@@ -217,8 +217,7 @@ for node in root.iter('node'):
 raise SystemExit(1)
 PY
 )" || true
-      if [[ -n "$wait_bounds" ]]; then
-        read -r wait_x wait_y <<< "$wait_bounds"
+      if [[ -n "$wait_bounds" ]]; then        read -r wait_x wait_y <<< "$wait_bounds"
         echo "Tapping verified Android ANR 'Wait' button at $wait_x,$wait_y"
         adb shell input tap "$wait_x" "$wait_y" >/dev/null 2>&1 || true
         wait_tapped=1
@@ -336,7 +335,7 @@ tap_resource() {
   # Controls are inside the upper controlScroll. Earlier test actions can leave
   # later buttons below the visible viewport, so scroll that container until
   # the requested resource ID appears instead of failing on a valid off-screen node.
-  for attempt in $(seq 1 6); do
+  for attempt in $(seq 1 12); do
     dump_ui || fail "UI dump failed before tap $resource_id"
     bounds="$(python3 - "$EVIDENCE/window.xml" "$resource_id" <<'PY'
 import sys, xml.etree.ElementTree as ET, re
@@ -388,10 +387,31 @@ PY
         fail "Control container and emulator screen dimensions unavailable while searching for $resource_id"
       fi
     fi
-    adb shell input swipe "$swipe_x" "$swipe_start" "$swipe_x" "$swipe_end" 350
+    # Try both scroll directions. A prior action can leave the viewport either
+    # above or below the target; always swiping only upward can miss a valid node.
+    if (( attempt % 2 == 0 )); then
+      adb shell input swipe "$swipe_x" "$swipe_end" "$swipe_x" "$swipe_start" 350
+      echo "Searching $resource_id: swipe toward earlier controls (attempt $attempt)"
+    else
+      adb shell input swipe "$swipe_x" "$swipe_start" "$swipe_x" "$swipe_end" 350
+      echo "Searching $resource_id: swipe toward later controls (attempt $attempt)"
+    fi
     sleep 1
   done
-  [[ -n "$bounds" ]] || fail "Control not found after scrolling controlScroll: $resource_id"
+  if [[ -z "$bounds" ]]; then
+    python3 - "$EVIDENCE/window.xml" "$EVIDENCE/missing-control-tree.txt" <<'PY'
+import sys, xml.etree.ElementTree as ET
+root=ET.parse(sys.argv[1]).getroot()
+with open(sys.argv[2], "w", encoding="utf-8") as out:
+    for n in root.iter("node"):
+        rid=n.attrib.get("resource-id","")
+        text=n.attrib.get("text","")
+        desc=n.attrib.get("content-desc","")
+        if rid or text or desc:
+            out.write(f"resource-id={rid!r} text={text!r} content-desc={desc!r} bounds={n.attrib.get('bounds','')}\n")
+PY
+    fail "Control not found after bidirectional scrolling: $resource_id"
+  fi
   read -r x y <<< "$bounds"
   adb shell input tap "$x" "$y"
   sleep 2
