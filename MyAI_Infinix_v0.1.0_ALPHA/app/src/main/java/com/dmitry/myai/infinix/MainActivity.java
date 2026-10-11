@@ -35,6 +35,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.testHome).setOnClickListener(v->run(()->MyAiAccessibilityService.home()));
         findViewById(R.id.testBack).setOnClickListener(v->run(()->MyAiAccessibilityService.back()));
         findViewById(R.id.testScroll).setOnClickListener(v->run(()->MyAiAccessibilityService.scrollDown()));
+        findViewById(R.id.testScrollUp).setOnClickListener(v->runTool("{\"tool\":\"scroll_up\",\"args\":{}}"));
         findViewById(R.id.testScreen).setOnClickListener(v->runTool("{\"tool\":\"get_screen_state\",\"args\":{}}"));
         findViewById(R.id.testTool).setOnClickListener(v->runTool("{\"tool\":\"home\",\"args\":{}}"));
         updateBridgeStatus();
