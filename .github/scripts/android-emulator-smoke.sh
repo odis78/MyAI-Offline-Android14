@@ -121,6 +121,7 @@ dump_ui
 # still expose the obscured controls, so tapping their coordinates would hit the
 # dialog instead. Dismiss it through the actual Wait button bounds before actions.
 recover_unresponsive_dialog() {
+  dialog_recovered=0
   dump_ui || return 1
   if ! grep -Eiq "(Settings|Process system|System UI|system_server).{0,80}isn't responding|isn't responding.{0,80}(Settings|Process system|System UI|system_server)" "$EVIDENCE/window.xml"; then
     return 0
@@ -132,7 +133,7 @@ root=ET.parse(sys.argv[1]).getroot()
 for n in root.iter('node'):
     text=(n.attrib.get('text','')+' '+n.attrib.get('content-desc','')).casefold()
     if n.attrib.get('resource-id') == 'android:id/aerr_wait' or text.strip() == 'wait':
-        m=re.fullmatch(r'\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]',n.attrib.get('bounds',''))
+        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
         if m:
             x1,y1,x2,y2=map(int,m.groups())
             print((x1+x2)//2, (y1+y2)//2)
@@ -144,6 +145,7 @@ PY
     read -r wx wy <<< "$wait_bounds"
     echo "Unresponsive system dialog detected; tapping Wait at $wx,$wy"
     adb shell input tap "$wx" "$wy" || true
+    dialog_recovered=1
     sleep 4
     adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
     adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
@@ -310,7 +312,8 @@ for attempt in $(seq 1 12); do
     home_ok=1
     break
   fi
-  if recover_unresponsive_dialog; then
+  recover_unresponsive_dialog || fail "Could not recover from emulator dialog while waiting for tool result"
+  if [[ "$dialog_recovered" -eq 1 ]]; then
     # If the dialog had intercepted the previous tap, bring the app back and retry.
     adb shell am start -W -n "$ACTIVITY" >/dev/null 2>&1 || true
     sleep 2
