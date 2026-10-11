@@ -24,9 +24,16 @@ public class MyAiAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root=instance.getRootInActiveWindow();
         return root==null?null:root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
     }
-    public static void home(){ require().performGlobalAction(GLOBAL_ACTION_HOME); }
-    public static void back(){ require().performGlobalAction(GLOBAL_ACTION_BACK); }
-    public static void recents(){ require().performGlobalAction(GLOBAL_ACTION_RECENTS); }
+    public static void home(){ performGlobalActionChecked(GLOBAL_ACTION_HOME, "Home"); }
+    public static void back(){ performGlobalActionChecked(GLOBAL_ACTION_BACK, "Back"); }
+    public static void recents(){ performGlobalActionChecked(GLOBAL_ACTION_RECENTS, "Recents"); }
+
+    private static void performGlobalActionChecked(int action, String label) {
+        MyAiAccessibilityService service = require();
+        if (!service.performGlobalAction(action)) {
+            throw new IllegalStateException(label + " global action was rejected by Android");
+        }
+    }
     public static void scrollDown(){
         MyAiAccessibilityService s=require();
         AccessibilityNodeInfo root=s.getRootInActiveWindow();
