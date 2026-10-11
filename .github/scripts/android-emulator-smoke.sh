@@ -191,12 +191,48 @@ recover_unresponsive_dialog() {
   adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
 
-  # Explicitly move selection to "Wait" before confirming. ENTER alone may
-  # activate "Close app" on some Android 14 ANR dialogs, which is unsafe.
-  adb shell input keyevent KEYCODE_DPAD_DOWN >/dev/null 2>&1 || true
-  sleep 1
-  adb shell input keyevent KEYCODE_ENTER >/dev/null 2>&1 || true
+  # Prefer tapping Android's actual "Wait" button by its accessibility bounds.
+  # DPAD navigation is unreliable when system_server itself is overloaded, and
+  # ENTER without verified focus could select "Close app".
   dialog_recovered=1
+  wait_tapped=0
+  for tap_attempt in $(seq 1 3); do
+    adb shell uiautomator dump /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 || true
+    if adb pull /data/local/tmp/myai-anr-dialog.xml "$EVIDENCE/window-anr-dialog.xml" >/dev/null 2>&1; then
+      wait_bounds="$(python3 - "$EVIDENCE/window-anr-dialog.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET, re
+try:
+    root=ET.parse(sys.argv[1]).getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter('node'):
+    rid=node.attrib.get('resource-id','')
+    if rid in ('android:id/aerr_wait', 'com.android.systemui:id/aerr_wait') or rid.endswith(':id/aerr_wait'):
+        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',node.attrib.get('bounds',''))
+        if m:
+            x1,y1,x2,y2=map(int,m.groups())
+            if x2>x1 and y2>y1:
+                print((x1+x2)//2, (y1+y2)//2)
+                raise SystemExit(0)
+raise SystemExit(1)
+PY
+)" || true
+      if [[ -n "$wait_bounds" ]]; then
+        read -r wait_x wait_y <<< "$wait_bounds"
+        echo "Tapping verified Android ANR 'Wait' button at $wait_x,$wait_y"
+        adb shell input tap "$wait_x" "$wait_y" >/dev/null 2>&1 || true
+        wait_tapped=1
+        break
+      fi
+    fi
+    sleep 1
+  done
+  if [[ "$wait_tapped" -ne 1 ]]; then
+    echo "Could not resolve the Android 'Wait' button bounds; using bounded DPAD fallback"
+    adb shell input keyevent KEYCODE_DPAD_DOWN >/dev/null 2>&1 || true
+    sleep 1
+    adb shell input keyevent KEYCODE_ENTER >/dev/null 2>&1 || true
+  fi
   for attempt in $(seq 1 12); do
     sleep 2
     if ! anr_window_visible; then
