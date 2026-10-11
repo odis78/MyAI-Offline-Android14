@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
     private void updateBridgeStatus(){
         if (status != null) status.setText(MyAiAccessibilityService.isConnected()?"Control Bridge: ПОДКЛЮЧЕН":"Control Bridge: НЕ ПОДКЛЮЧЕН");
     }
-    void append(String s){runOnUiThread(() -> { if(log==null)return; log.append(s+"\\n"); log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN)); });}
+    void append(String s){runOnUiThread(() -> { if(log==null)return; log.append(s+"\n"); log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN)); });}
     @Override protected void onResume(){
         super.onResume();
         activityResumed = true;
