@@ -19,7 +19,7 @@ adb() {
       install) limit=90 ;;
     esac
   done
-  timeout --foreground "${limit}s" command adb "$@"
+  timeout --foreground "${limit}s" adb "$@"
 }
 
 mkdir -p "$EVIDENCE"
