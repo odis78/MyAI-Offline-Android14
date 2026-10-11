@@ -55,6 +55,19 @@ prestart_output="$(adb shell am start -W -n "$ACTIVITY" 2>&1 || true)"
 printf '%s\n' "$prestart_output" | tee "$EVIDENCE/activity-prestart.txt"
 sleep 5
 
+# Capture the pre-Accessibility baseline. Run #32 showed a System UI ANR
+# before the test enabled the MyAI Accessibility service, so preserve evidence
+# at this boundary instead of attributing the later overlay to MyAI by default.
+adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-pre-accessibility.txt" 2>&1 || true
+adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-pre-accessibility.txt" 2>&1 || true
+adb shell dumpsys window windows > "$EVIDENCE/windows-pre-accessibility.txt" 2>&1 || true
+adb shell dumpsys activity processes > "$EVIDENCE/processes-pre-accessibility.txt" 2>&1 || true
+grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-pre-accessibility.txt" > "$EVIDENCE/anr-summary-pre-accessibility.txt" 2>/dev/null || true
+if grep -Eiq 'ANR in (com\\.android\\.systemui|com\\.android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
+  echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
+  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
+fi
+
 service_discovered=0
 for attempt in $(seq 1 60); do
   installed_count="$(adb shell dumpsys accessibility 2>/dev/null | grep -oE 'installedServiceCount=[0-9]+' | head -n 1 | cut -d= -f2 || true)"
