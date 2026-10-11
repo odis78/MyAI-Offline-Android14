@@ -12,6 +12,9 @@ SERVICE="$PKG/com.dmitry.myai.infinix.bridge.MyAiAccessibilityService"
 mkdir -p "$EVIDENCE"
 capture_failure_evidence() {
   local tag="${1:-failure}"
+  # Preserve device connectivity evidence before recovery or restarts can overwrite it.
+  adb devices -l > "$EVIDENCE/adb-devices-${tag}.txt" 2>&1 || true
+  adb version > "$EVIDENCE/adb-version-${tag}.txt" 2>&1 || true
   # Preserve attribution before recovery or restarts can overwrite the evidence.
   adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-${tag}.txt" 2>&1 || true
   adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-${tag}.txt" 2>&1 || true
