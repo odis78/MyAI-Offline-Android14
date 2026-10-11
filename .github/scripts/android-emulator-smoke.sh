@@ -100,19 +100,51 @@ if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_s
     sleep 5
   done
   [[ "$rebooted" -eq 1 ]] || fail "Emulator did not finish rebooting after pre-Accessibility system ANR"
-  # Reboot can leave PackageManager briefly stale on overloaded API 34 AVDs.
-  # Verify the package/activity explicitly and reinstall the already-built APK if
-  # package state was lost; do not continue with a false-positive launch attempt.
+  # A boot-completed property can become true before PackageManager and
+  # ActivityTaskManager are responsive again after a system_server/ANR reboot.
+  # Wait for Android's core services before deciding that the installed app vanished.
+  package_manager_ready=0
+  for attempt in $(seq 1 30); do
+    package_service="$(adb shell service check package 2>/dev/null | tr -d '\r' || true)"
+    activity_service="$(adb shell service check activity 2>/dev/null | tr -d '\r' || true)"
+    package_probe="$(adb shell pm path android 2>/dev/null | tr -d '\r' || true)"
+    if printf '%s' "$package_service" | grep -qi 'found' &&
+       printf '%s' "$activity_service" | grep -qi 'found' &&
+       [[ -n "$package_probe" ]]; then
+      package_manager_ready=1
+      break
+    fi
+    echo "Waiting for PackageManager/ActivityManager after reboot (attempt $attempt)"
+    sleep 3
+  done
+  [[ "$package_manager_ready" -eq 1 ]] || {
+    adb shell service list > "$EVIDENCE/services-after-reboot.txt" 2>&1 || true
+    adb shell dumpsys package > "$EVIDENCE/package-manager-after-reboot.txt" 2>&1 || true
+    fail "Android package/activity services did not recover after ANR reboot"
+  }
+
+  # Verify package presence only after the framework is responsive. If Android
+  # genuinely lost the package registration, reinstall the same already-built APK.
   package_path="$(adb shell pm path "$PKG" 2>/dev/null | tr -d '\r' || true)"
   if [[ -z "$package_path" ]]; then
     echo "MyAI package is not registered after reboot; reinstalling the same debug APK"
     adb install -r "$APK" > "$EVIDENCE/apk-install-after-reboot.txt" 2>&1 || fail "Could not reinstall APK after ANR reboot"
   fi
-  resolved_activity="$(adb shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+
+  resolved_activity=""
+  for attempt in $(seq 1 20); do
+    resolved_activity="$(adb shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+    if [[ "$resolved_activity" == *"$PKG"*".MainActivity" || "$resolved_activity" == "$ACTIVITY" ]]; then
+      break
+    fi
+    echo "Waiting for MainActivity resolution after reboot (attempt $attempt)"
+    sleep 2
+  done
   printf '%s\n' "$resolved_activity" > "$EVIDENCE/resolved-activity-after-reboot.txt"
   if [[ "$resolved_activity" != *"$PKG"*".MainActivity" && "$resolved_activity" != "$ACTIVITY" ]]; then
     adb shell dumpsys package "$PKG" > "$EVIDENCE/package-after-reboot.txt" 2>&1 || true
-    fail "MainActivity is not resolvable after reboot: $resolved_activity"
+    adb shell cmd package resolve-activity --brief "$PKG" > "$EVIDENCE/resolve-activity-final.txt" 2>&1 || true
+    fail "MainActivity is not resolvable after framework readiness wait: $resolved_activity"
   fi
   adb shell am start -W -n "$ACTIVITY" > "$EVIDENCE/activity-post-anr-reboot.txt" 2>&1 || fail "Could not relaunch MainActivity after baseline ANR reboot"
   if grep -Eiq 'Error: Activity class|does not exist|unable to resolve' "$EVIDENCE/activity-post-anr-reboot.txt"; then
