@@ -191,9 +191,10 @@ recover_unresponsive_dialog() {
   adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
 
-  # On the stock Android ANR dialog, Wait is the default action. ENTER chooses
-  # that action without force-stopping Settings/system_server or blindly tapping
-  # coordinates from the obscured app hierarchy.
+  # Explicitly move selection to "Wait" before confirming. ENTER alone may
+  # activate "Close app" on some Android 14 ANR dialogs, which is unsafe.
+  adb shell input keyevent KEYCODE_DPAD_DOWN >/dev/null 2>&1 || true
+  sleep 1
   adb shell input keyevent KEYCODE_ENTER >/dev/null 2>&1 || true
   dialog_recovered=1
   for attempt in $(seq 1 12); do
