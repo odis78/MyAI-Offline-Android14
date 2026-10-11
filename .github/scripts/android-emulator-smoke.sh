@@ -330,9 +330,29 @@ for n in root.iter('node'):
             raise SystemExit(0)
 raise SystemExit(1)
 PY
-)" || fail "Control container not found while searching for $resource_id"
-    read -r x1 y1 x2 y2 <<< "$container_bounds"
-    adb shell input swipe "$((x1+x2)/2)" "$((y2-40))" "$((x1+x2)/2)" "$((y1+40))" 350
+)" || true
+    if [[ -n "$container_bounds" ]]; then
+      read -r x1 y1 x2 y2 <<< "$container_bounds"
+      swipe_x="$(((x1+x2)/2))"
+      swipe_start="$((y2-40))"
+      swipe_end="$((y1+40))"
+    else
+      # Some Android 14 UIAutomator dumps omit the ScrollView node even though
+      # its child controls are present. Fall back to a swipe within the upper
+      # control area, not the lower action-log viewport.
+      screen_size="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | tail -n 1 || true)"
+      if [[ "$screen_size" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+        screen_w="${BASH_REMATCH[1]}"
+        screen_h="${BASH_REMATCH[2]}"
+        swipe_x="$((screen_w/2))"
+        swipe_start="$((screen_h*48/100))"
+        swipe_end="$((screen_h*18/100))"
+        echo "controlScroll node missing from UI hierarchy; using bounded upper-area swipe fallback"
+      else
+        fail "Control container and emulator screen dimensions unavailable while searching for $resource_id"
+      fi
+    fi
+    adb shell input swipe "$swipe_x" "$swipe_start" "$swipe_x" "$swipe_end" 350
     sleep 1
   done
   [[ -n "$bounds" ]] || fail "Control not found after scrolling controlScroll: $resource_id"
