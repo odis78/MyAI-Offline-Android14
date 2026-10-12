@@ -141,99 +141,14 @@ adb shell dumpsys activity processes > "$EVIDENCE/processes-pre-accessibility.tx
 grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-pre-accessibility.txt" > "$EVIDENCE/anr-summary-pre-accessibility.txt" 2>/dev/null || true
 if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|com[.]android[.]phone|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
   echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
-  # Preserve the original ANR files before reboot; shell access may be denied,
-  # but the bugreport attempt and permission errors are still captured.
+  # Run #88's separate clean-emulator job observed the same class of System/UI ANR
+  # without MyAI installed. Do not reboot automatically based on this signature:
+  # adb reboot/reconnect can stall on the unhealthy AVD and consume the job timeout.
+  # Preserve evidence and let the bounded ANR-dialog recovery below decide whether
+  # the emulator is usable for smoke actions.
   capture_anr_traces pre-accessibility
-  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
-  # The baseline already shows a system ANR before MyAI Accessibility is enabled.
-  # Reboot once to avoid testing the agent on a known-unhealthy framework state.
-  echo "Rebooting emulator once after pre-Accessibility system ANR"
-  # A system ANR can also leave the adb transport/daemon temporarily unusable.
-  # Retry the transport once before declaring the reboot unrecoverable.
-  if ! adb reboot; then
-    echo "First adb reboot request failed; restarting adb server and retrying transport"
-    adb kill-server >/dev/null 2>&1 || true
-    sleep 2
-    adb start-server >/dev/null 2>&1 || true
-    if ! adb wait-for-device; then
-      adb devices -l > "$EVIDENCE/adb-devices-reboot-recovery.txt" 2>&1 || true
-      fail "Emulator did not reconnect after adb server recovery for ANR reboot"
-    fi
-    # If the device is still fully booted, the first reboot did not take effect.
-    boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-    if [[ "$boot_state" == "1" ]]; then
-      adb reboot || fail "Could not reboot emulator after adb server recovery"
-    fi
-  fi
-  adb wait-for-device || fail "Emulator did not reconnect after pre-Accessibility ANR reboot"
-  rebooted=0
-  for attempt in $(seq 1 90); do
-    value="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-    if [[ "$value" == "1" ]]; then rebooted=1; break; fi
-    sleep 5
-  done
-  [[ "$rebooted" -eq 1 ]] || fail "Emulator did not finish rebooting after pre-Accessibility system ANR"
-  # A boot-completed property can become true before PackageManager and
-  # ActivityTaskManager are responsive again after a system_server/ANR reboot.
-  # Wait for Android's core services before deciding that the installed app vanished.
-  package_manager_ready=0
-  for attempt in $(seq 1 30); do
-    package_service="$(adb shell service check package 2>/dev/null | tr -d '\r' || true)"
-    activity_service="$(adb shell service check activity 2>/dev/null | tr -d '\r' || true)"
-    package_probe="$(adb shell pm path android 2>/dev/null | tr -d '\r' || true)"
-    if printf '%s' "$package_service" | grep -qi 'found' &&
-       printf '%s' "$activity_service" | grep -qi 'found' &&
-       [[ -n "$package_probe" ]]; then
-      package_manager_ready=1
-      break
-    fi
-    echo "Waiting for PackageManager/ActivityManager after reboot (attempt $attempt)"
-    sleep 3
-  done
-  [[ "$package_manager_ready" -eq 1 ]] || {
-    adb shell service list > "$EVIDENCE/services-after-reboot.txt" 2>&1 || true
-    adb shell dumpsys package > "$EVIDENCE/package-manager-after-reboot.txt" 2>&1 || true
-    fail "Android package/activity services did not recover after ANR reboot"
-  }
-
-  # Verify package presence only after the framework is responsive. If Android
-  # genuinely lost the package registration, reinstall the same already-built APK.
-  package_path="$(adb shell pm path "$PKG" 2>/dev/null | tr -d '\r' || true)"
-  if [[ -z "$package_path" ]]; then
-    echo "MyAI package is not registered after reboot; reinstalling the same debug APK"
-    adb install -r "$APK" > "$EVIDENCE/apk-install-after-reboot.txt" 2>&1 || fail "Could not reinstall APK after ANR reboot"
-  fi
-
-  resolved_activity=""
-  for attempt in $(seq 1 20); do
-    resolved_activity="$(adb shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
-    if [[ "$resolved_activity" == *"$PKG"*".MainActivity" || "$resolved_activity" == "$ACTIVITY" ]]; then
-      break
-    fi
-    echo "Waiting for MainActivity resolution after reboot (attempt $attempt)"
-    sleep 2
-  done
-  printf '%s\n' "$resolved_activity" > "$EVIDENCE/resolved-activity-after-reboot.txt"
-  if [[ "$resolved_activity" != *"$PKG"*".MainActivity" && "$resolved_activity" != "$ACTIVITY" ]]; then
-    adb shell dumpsys package "$PKG" > "$EVIDENCE/package-after-reboot.txt" 2>&1 || true
-    adb shell cmd package resolve-activity --brief "$PKG" > "$EVIDENCE/resolve-activity-final.txt" 2>&1 || true
-    fail "MainActivity is not resolvable after framework readiness wait: $resolved_activity"
-  fi
-  adb shell am start -W -n "$ACTIVITY" > "$EVIDENCE/activity-post-anr-reboot.txt" 2>&1 || fail "Could not relaunch MainActivity after baseline ANR reboot"
-  if grep -Eiq 'Error: Activity class|does not exist|unable to resolve' "$EVIDENCE/activity-post-anr-reboot.txt"; then
-    adb shell dumpsys package "$PKG" > "$EVIDENCE/package-after-reboot.txt" 2>&1 || true
-    fail "Android rejected MainActivity after reboot; see package-after-reboot.txt"
-  fi
-  sleep 5
-  adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" 2>&1 || true
-  adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt" 2>&1 || true
-  adb shell dumpsys window windows > "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" 2>&1 || true
-  if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|com[.]android[.]phone|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility-after-reboot.txt" "$EVIDENCE/windows-pre-accessibility-after-reboot.txt" "$EVIDENCE/lastanr-pre-accessibility-after-reboot.txt"; then
-    echo "WARNING: System/UI ANR persists after reboot; evidence will be retained."
-    printf '%s\n' "System/UI ANR signature persists after reboot before Accessibility." > "$EVIDENCE/pre-accessibility-anr-persists-marker.txt"
-  fi
+  printf '%s\\n' "System/UI ANR signature detected before Accessibility enablement; retained as baseline evidence, no automatic reboot." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
 fi
-
 service_discovered=0
 for attempt in $(seq 1 60); do
   installed_count="$(adb shell dumpsys accessibility 2>/dev/null | grep -oE 'installedServiceCount=[0-9]+' | head -n 1 | cut -d= -f2 || true)"
