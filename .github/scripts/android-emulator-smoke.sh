@@ -46,7 +46,15 @@ wait_for_accessibility_bound() {
   local attempts="${1:-20}" state
   for attempt in $(seq 1 "$attempts"); do
     state="$(adb shell dumpsys accessibility 2>/dev/null || true)"
-    if printf '%s\n' "$state" | grep -A 8 'Bound services:' | grep -Fq "$PKG"; then
+    if printf '%s\n' "$state" | awk -v pkg="$PKG" '
+      /Bound services:/ {
+        line=$0
+        sub(/.*Bound services:\{/, "", line)
+        sub(/\}.*/, "", line)
+        if (index(line, pkg) > 0) found=1
+      }
+      END { exit !found }
+    '; then
       printf '%s\n' "$state" > "$EVIDENCE/accessibility-bound-current.txt"
       return 0
     fi
