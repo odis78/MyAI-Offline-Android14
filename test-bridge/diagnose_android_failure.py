@@ -61,19 +61,36 @@ for name, body in text_by_file.items():
     if name.startswith("window") and name.endswith(".xml"):
         m = status_disconnected.search(body)
         if m:
-            stale.append({"file": name, "line": body[:m.start()].count("\n") + 1, "evidence": m.group(0)[:400]})
+            stale.append({"file": name, "line": body[:m.start()].count("\\n") + 1, "evidence": m.group(0)[:400]})
 service_connected = any("SERVICE CONNECTED" in body or "SERVICE REBOUND" in body for body in text_by_file.values())
+# UiAutomator registers UiTestAutomationService and temporarily takes over the
+# accessibility framework. A window.xml captured during that interval can show
+# a stale "disconnected" label and generate expected UNBOUND/REBOUND log pairs.
+ui_automation = collect(re.compile(r"Registering UiTestAutomationService"), name_pred=lambda n: "logcat" in n.lower())
 if stale and service_connected:
-    add("BRIDGE_STATUS_STALE", "Сервис подключался, но видимый узел статуса остался «НЕ ПОДКЛЮЧЕН».",
-        "Проверьте обновление статуса по ConnectionListener, повторный onResume и актуальность window.xml.",
-        stale)
+    if ui_automation:
+        add("TEST_HARNESS_ACCESSIBILITY_TAKEOVER",
+            "Статус «НЕ ПОДКЛЮЧЕН» снят в window.xml, но в тех же логах есть регистрация UiTestAutomationService. UIAutomator временно забирает Accessibility и может вызвать именно такое состояние; этот снимок не доказывает ошибку ConnectionListener.",
+            "Не менять код приложения по этому снимку. Проверять подключение по dumpsys accessibility после завершения UIAutomator и искать статусную регрессию только в снимке, сделанном вне takeover.",
+            ui_automation[:6])
+    else:
+        add("BRIDGE_STATUS_STALE", "Сервис подключался, но видимый узел статуса остался «НЕ ПОДКЛЮЧЕН»; в логах не найдено явного захвата Accessibility тестовым UiAutomator.",
+            "Сопоставьте время снимка window.xml с ConnectionListener, onResume и состоянием Bound services. Не меняйте код без подтверждения, что снимок сделан вне UiAutomator takeover.",
+            stale)
 
-rebind_body = "\n".join(body for name, body in text_by_file.items() if "logcat" in name.lower())
+rebind_body = "\\n".join(body for name, body in text_by_file.items() if "logcat" in name.lower())
 rebind_count = len(re.findall(r"SERVICE REBOUND|SERVICE CONNECTED", rebind_body))
 if rebind_count >= 5:
-    add("ACCESSIBILITY_REBIND", f"Обнаружено {rebind_count} событий подключения/переподключения в собранных логах.",
-        "Сверьте временные метки SERVICE UNBOUND / SERVICE DESTROYED и системные ANR. Частые события не доказывают краш без дополнительных признаков.",
-        collect(re.compile(r"SERVICE REBOUND|SERVICE CONNECTED|SERVICE UNBOUND|SERVICE DESTROYED"), name_pred=lambda n: "logcat" in n.lower()))
+    rebind_evidence = collect(re.compile(r"SERVICE REBOUND|SERVICE CONNECTED|SERVICE UNBOUND|SERVICE DESTROYED"), name_pred=lambda n: "logcat" in n.lower())
+    if ui_automation:
+        add("TEST_HARNESS_ACCESSIBILITY_REBIND",
+            f"Обнаружено {rebind_count} подключений/переподключений при наличии событий UiTestAutomationService. Это совместимо с временным захватом Accessibility тестовым UIAutomator и само по себе не доказывает нестабильность службы MyAI.",
+            "Сопоставлять UNBOUND/DESTROYED с временными метками UiTestAutomationService. Подозревать код MyAI только если отключение воспроизводится вне тестового захвата или сопровождается стеком/крашем MyAI.",
+            ui_automation[:6] + rebind_evidence[:6])
+    else:
+        add("ACCESSIBILITY_REBIND", f"Обнаружено {rebind_count} событий подключения/переподключения в собранных логах.",
+            "Сверьте временные метки SERVICE UNBOUND / SERVICE DESTROYED и системные ANR. Частые события не доказывают краш без дополнительных признаков.",
+            rebind_evidence)
 
 add("UI_ASSERTION", "Smoke-тест не нашёл ожидаемый UI-элемент.",
     "Сохраните window.xml и screenshot; проверьте resource-id, видимость, прокрутку и наличие системного диалога.",
