@@ -50,7 +50,7 @@ wait_for_accessibility_bound() {
     # component/package name. Verify the MyAI label is actually in Bound
     # services AND the exact component remains enabled in Enabled services.
     if printf '%s\n' "$state" | awk -v pkg="$PKG" '
-      /Bound services:/ && /Service\\[label=MyAI/ { found_bound=1 }
+      /Bound services:/ && /Service\[label=MyAI/ { found_bound=1 }
       /Enabled services:/ && index($0, pkg) > 0 { found_enabled=1 }
       END { exit !(found_bound && found_enabled) }
     '; then
