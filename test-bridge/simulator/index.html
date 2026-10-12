@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Infinix Note 30 Pro — MyAI Test Simulator</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#172033;background:#eef2f8}*{box-sizing:border-box}
+body{margin:0;padding:18px;display:flex;justify-content:center}.device{width:min(100%,390px);min-height:740px;background:#111827;border-radius:34px;padding:12px;box-shadow:0 12px 36px #1f293744}
+.screen{background:#f8fafc;border-radius:25px;min-height:710px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.status{display:flex;justify-content:space-between;font-size:12px}.title{font-weight:800;font-size:18px}.meta{font-size:12px;color:#64748b}
+.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.app,button{border:1px solid #d8e0ec;border-radius:12px;padding:10px;background:white;color:#172033;cursor:pointer}.app{min-height:70px}
+.panel{border:1px solid #d8e0ec;border-radius:14px;padding:12px;background:white}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1;min-width:90px}
+#appView[hidden],#home[hidden]{display:none}#log{height:95px;overflow:auto;font:12px ui-monospace,monospace;background:#0f172a;color:#dbeafe;border-radius:10px;padding:8px}
+input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px}.nav{margin-top:auto;display:flex;justify-content:center;gap:30px}.nav button{border-radius:99px;min-width:60px}
+</style>
+</head>
+<body><main class="device" aria-label="Infinix Note 30 Pro"><section class="screen">
+<div class="status"><span>12:21 · LTE</span><span>Wi-Fi ▰ 87%</span></div>
+<div class="title">Infinix Note 30 Pro</div><div class="meta">Android 14 · 8 GB RAM · Helio G99 Ultimate · SIMULATOR</div>
+<section id="home" aria-label="Рабочий стол">
+<div class="panel"><strong>Добро пожаловать</strong><p class="meta">Тестовый интерфейс для проверки команд MyAI</p></div>
+<div class="apps">
+<button class="app" data-app="Телефон">☎️<br>Телефон</button><button class="app" data-app="Камера">📷<br>Камера</button><button class="app" data-app="Галерея">🖼️<br>Галерея</button>
+<button class="app" data-app="Настройки">⚙️<br>Настройки</button><button class="app" data-app="Браузер">🌐<br>Браузер</button><button class="app" data-app="Файлы">📁<br>Файлы</button>
+</div></section>
+<section id="appView" class="panel" hidden aria-live="polite"><strong id="appTitle"></strong><p id="appBody">Экран приложения</p><div id="settingsControls" hidden><button id="wifi">Wi-Fi: Вкл.</button><button id="accessibility">Спец. возможности: Выкл.</button></div></section>
+<section class="panel"><strong>MyAI Test Bridge</strong><div class="actions"><button id="back">Назад</button><button id="homeBtn">Домой</button><button id="scroll">Прокрутка ↓</button></div>
+<form id="commandForm"><label for="command">Команда агента</label><input id="command" placeholder="Например: открыть настройки"><div class="actions"><button type="submit">Выполнить</button><button id="runTests" type="button">Базовый тест</button></div></form>
+</section>
+<div><strong>Журнал действий</strong><div id="log" role="log" aria-label="Журнал действий"></div></div>
+<div class="nav"><button id="navBack" aria-label="Системная назад">◁</button><button id="navHome" aria-label="Системная домой">○</button><button id="recent" aria-label="Недавние">▢</button></div>
+</section></main>
+<script>
+(() => {
+ const $ = id => document.getElementById(id); let current = 'Рабочий стол', scrollCount = 0;
+ function log(message, status='OK') { const row=document.createElement('div'); row.textContent=new Date().toLocaleTimeString()+' ['+status+'] '+message; $('log').append(row); $('log').scrollTop=$('log').scrollHeight; }
+ function openApp(name) { current=name; $('home').hidden=true; $('appView').hidden=false; $('appTitle').textContent=name; $('appBody').textContent='Открыто приложение: '+name; $('settingsControls').hidden=name!=='Настройки'; log('Открыто: '+name); }
+ function goHome() { current='Рабочий стол'; $('home').hidden=false; $('appView').hidden=true; log('Переход на рабочий стол'); }
+ function goBack() { if (!$('appView').hidden) goHome(); else log('Назад: уже на рабочем столе','INFO'); }
+ document.querySelectorAll('[data-app]').forEach(b=>b.addEventListener('click',()=>openApp(b.dataset.app)));
+ $('back').onclick=$('navBack').onclick=goBack; $('homeBtn').onclick=$('navHome').onclick=goHome;
+ $('recent').onclick=()=>{openApp('Недавние приложения');};
+ $('scroll').onclick=()=>{scrollCount++; $('log').scrollTop=$('log').scrollHeight; log('Прокрутка выполнена #'+scrollCount);};
+ $('wifi').onclick=()=>{const b=$('wifi');b.textContent=b.textContent.includes('Вкл.')?'Wi-Fi: Выкл.':'Wi-Fi: Вкл.';log(b.textContent);};
+ $('accessibility').onclick=()=>{const b=$('accessibility');b.textContent=b.textContent.includes('Выкл.')?'Спец. возможности: Вкл.':'Спец. возможности: Выкл.';log(b.textContent);};
+ function runCommand(raw) { const c=raw.trim().toLowerCase(); if(!c) {log('Пустая команда','ERROR');return;}
+   if(c.includes('настрой')) openApp('Настройки'); else if(c.includes('камер')) openApp('Камера'); else if(c.includes('галере')) openApp('Галерея'); else if(c.includes('файл')) openApp('Файлы'); else if(c.includes('брауз')) openApp('Браузер'); else if(c.includes('домой')||c.includes('рабочий стол')) goHome(); else if(c==='назад'||c.includes('вернись назад')) goBack(); else if(c.includes('прокрут')) {scrollCount++;log('Прокрутка выполнена #'+scrollCount);} else log('Команда не распознана: '+raw,'ERROR');
+ }
+ $('commandForm').addEventListener('submit',e=>{e.preventDefault();runCommand($('command').value);});
+ $('runTests').onclick=()=>{const before=current;openApp('Настройки');goBack();const passed=current==='Рабочий стол';log('Проверка открытия и возврата: '+(passed?'PASS':'FAIL'),passed?'PASS':'ERROR');if(!passed) document.body.dataset.testFailure='back-navigation';};
+ window.myaiSimulator={getState:()=>({current,scrollCount}),runCommand,log};
+ log('Симулятор готов');
+})();
+</script></body></html>

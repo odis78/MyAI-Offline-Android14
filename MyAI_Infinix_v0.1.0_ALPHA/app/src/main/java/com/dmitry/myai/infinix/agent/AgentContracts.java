@@ -9,7 +9,17 @@ import com.dmitry.myai.infinix.tools.ToolResult;
 public final class AgentContracts {
     private AgentContracts() {}
     public enum Mode { OFFLINE, ONLINE, AUTO }
-    public record AgentCommand(String name, String payload, boolean requiresConfirmation) {}
+    public static final class AgentCommand {
+        public final String name;
+        public final String payload;
+        public final boolean requiresConfirmation;
+
+        public AgentCommand(String name, String payload, boolean requiresConfirmation) {
+            this.name = name == null ? "" : name;
+            this.payload = payload == null ? "" : payload;
+            this.requiresConfirmation = requiresConfirmation;
+        }
+    }
 
     public static final class ToolAgent {
         private final ToolExecutor executor;

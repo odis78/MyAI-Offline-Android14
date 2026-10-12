@@ -47,7 +47,7 @@ grep -Fq 'GLOBAL_ACTION_BACK' "$SERVICE"
 grep -Fq 'GLOBAL_ACTION_HOME' "$SERVICE"
 grep -Fq 'dispatchGesture' "$SERVICE"
 
-for id in status log accessibility testHome testBack testScroll testScreen testTool logScroll; do
+for id in status log accessibility testHome testBack testScroll testScrollUp testScreen testTool logScroll; do
   grep -Fq "@+id/$id" "$R/app/src/main/res/layout/activity_main.xml"
   grep -Fq "R.id.$id" "$R/app/src/main/java/com/dmitry/myai/infinix/MainActivity.java"
 done
@@ -80,4 +80,10 @@ grep -Fq 'class VerificationEngine' "$R/app/src/main/java/com/dmitry/myai/infini
 grep -Fq 'get_screen_state' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'type_text' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'recents' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
+grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
+grep -Fq 'scroll_up' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
+grep -Fq 'scroll_up' "$R/app/src/main/java/com/dmitry/myai/infinix/safety/PolicyGate.java"
+grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/safety/PolicyGate.java"
+grep -Fq 'new JSONObject(json)' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolProtocol.java"
+grep -Fq 'node.recycle()' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'dispatchJson' "$R/app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java"
