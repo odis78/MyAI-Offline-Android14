@@ -147,7 +147,7 @@ if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|com[.]an
   # Preserve evidence and let the bounded ANR-dialog recovery below decide whether
   # the emulator is usable for smoke actions.
   capture_anr_traces pre-accessibility
-  printf '%s\\n' "System/UI ANR signature detected before Accessibility enablement; retained as baseline evidence, no automatic reboot." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
+  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement; retained as baseline evidence, no automatic reboot." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
 fi
 service_discovered=0
 for attempt in $(seq 1 60); do
