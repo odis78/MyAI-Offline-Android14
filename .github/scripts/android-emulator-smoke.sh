@@ -226,6 +226,16 @@ dump_ui() {
     # again before tapping controls that invoke Accessibility-backed tools.
     if ! wait_for_accessibility_bound 20; then
       echo "MyAI Accessibility service did not rebind after UI hierarchy dump"
+      # API 34 headless emulators can raise a system/phone ANR between the
+      # pre-dump check and this retry. In that case UiTestAutomationBridge
+      # returns a null root and temporarily displaces MyAI's accessibility
+      # binding. Re-check WindowManager and recover the overlay before retrying.
+      if declare -F recover_unresponsive_dialog >/dev/null 2>&1; then
+        if anr_window_visible; then
+          echo "ANR overlay appeared during UI dump; attempting bounded recovery"
+          recover_unresponsive_dialog || echo "ANR recovery did not complete during UI dump; preserving evidence and retrying"
+        fi
+      fi
       continue
     fi
     if printf '%s' "$output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
