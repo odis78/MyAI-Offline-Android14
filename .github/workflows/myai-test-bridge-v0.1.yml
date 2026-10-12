@@ -73,7 +73,9 @@ jobs:
             adb shell dumpsys activity lastanr > test-bridge/clean-baseline-evidence/lastanr-clean-baseline.txt 2>&1 || true
             adb shell dumpsys window windows > test-bridge/clean-baseline-evidence/windows-clean-baseline.txt 2>&1 || true
             adb shell dumpsys activity processes > test-bridge/clean-baseline-evidence/processes-clean-baseline.txt 2>&1 || true
-            if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|system_server)|Application Not Responding: (system|System UI|Settings)' test-bridge/clean-baseline-evidence/logcat-clean-baseline.txt test-bridge/clean-baseline-evidence/windows-clean-baseline.txt test-bridge/clean-baseline-evidence/lastanr-clean-baseline.txt; then echo "System/UI ANR observed on clean emulator without MyAI installed." | tee test-bridge/clean-baseline-evidence/BASELINE_ANR_FOUND.txt; else echo "No known System/UI ANR signature observed during clean 45-second baseline." | tee test-bridge/clean-baseline-evidence/BASELINE_NO_ANR_SIGNATURE.txt; fi
+            adb shell dumpsys accessibility > test-bridge/clean-baseline-evidence/accessibility-clean-baseline.txt 2>&1 || true
+            adb shell cat /proc/loadavg > test-bridge/clean-baseline-evidence/loadavg-clean-baseline.txt 2>&1 || true
+            if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|com[.]android[.]phone|system_server)|Application Not Responding: (system|System UI|Settings)' test-bridge/clean-baseline-evidence/logcat-clean-baseline.txt test-bridge/clean-baseline-evidence/windows-clean-baseline.txt test-bridge/clean-baseline-evidence/lastanr-clean-baseline.txt; then echo "System/UI ANR observed on clean emulator without MyAI installed." | tee test-bridge/clean-baseline-evidence/BASELINE_ANR_FOUND.txt; else echo "No known System/UI ANR signature observed during clean 45-second baseline." | tee test-bridge/clean-baseline-evidence/BASELINE_NO_ANR_SIGNATURE.txt; fi
       - name: Upload clean emulator baseline evidence
         if: always()
         uses: actions/upload-artifact@v4
