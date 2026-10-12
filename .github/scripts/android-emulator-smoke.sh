@@ -161,7 +161,7 @@ if grep -Eiq 'ANR in (com[.]android[.]systemui|com[.]android[.]settings|com[.]an
       fail "Emulator did not reconnect after adb server recovery for ANR reboot"
     fi
     # If the device is still fully booted, the first reboot did not take effect.
-    boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+    boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
     if [[ "$boot_state" == "1" ]]; then
       adb reboot || fail "Could not reboot emulator after adb server recovery"
     fi
