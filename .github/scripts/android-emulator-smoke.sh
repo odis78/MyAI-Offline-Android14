@@ -46,14 +46,13 @@ wait_for_accessibility_bound() {
   local attempts="${1:-20}" state
   for attempt in $(seq 1 "$attempts"); do
     state="$(adb shell dumpsys accessibility 2>/dev/null || true)"
+    # Android 14 dumpsys prints a bound service's label here, not its
+    # component/package name. Verify the MyAI label is actually in Bound
+    # services AND the exact component remains enabled in Enabled services.
     if printf '%s\n' "$state" | awk -v pkg="$PKG" '
-      /Bound services:/ {
-        line=$0
-        sub(/.*Bound services:\{/, "", line)
-        sub(/\}.*/, "", line)
-        if (index(line, pkg) > 0) found=1
-      }
-      END { exit !found }
+      /Bound services:/ && /Service\\[label=MyAI/ { found_bound=1 }
+      /Enabled services:/ && index($0, pkg) > 0 { found_enabled=1 }
+      END { exit !(found_bound && found_enabled) }
     '; then
       printf '%s\n' "$state" > "$EVIDENCE/accessibility-bound-current.txt"
       return 0
