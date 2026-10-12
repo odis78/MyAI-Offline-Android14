@@ -592,8 +592,31 @@ PY
   sleep 2
 }
 
+# Tool dispatch runs on the app's single-thread executor. On a slow or ANR-affected
+# emulator, the result may be logged after tap_resource's short UI settle delay.
+# Poll for the explicit result and report FAIL results rather than misclassifying
+# delayed execution as a broken tool.
+wait_for_tool_result() {
+  local tool="$1" expected="$2" line=""
+  for attempt in $(seq 1 15); do
+    line="$(adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -F "TOOL_RESULT ${tool}:" | tail -n 1 || true)"
+    if [[ -n "$line" ]]; then
+      echo "Observed tool result: $line"
+      if printf '%s\n' "$line" | grep -Fq "$expected"; then
+        return 0
+      fi
+      echo "Tool $tool returned a non-success result" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  echo "Timed out waiting for tool result: $tool" >&2
+  adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -F "TOOL_RESULT" | tail -n 30 || true
+  return 1
+}
+
 tap_resource "testScreen"
-adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT get_screen_state: OK screen captured' || fail "get_screen_state tool did not report success"
+wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success (see explicit tool result/timeout above)"
 dump_ui || fail "UI dump failed after screen-state test"
 cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
 # UI labels or results can vary; require the app to remain foreground and capture the output.
@@ -601,7 +624,7 @@ adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
 tap_resource "testScrollUp"
-adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT scroll_up: OK scroll dispatched' || fail "scroll_up tool did not report success"
+wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
 
 # The Home tool legitimately backgrounds MainActivity. First dismiss any
 # emulator ANR overlay, then tap the control and poll for its result. If an ANR
