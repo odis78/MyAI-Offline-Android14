@@ -235,18 +235,39 @@ anr_window_visible() {
 }
 
 recover_unresponsive_dialog() {
-  # Do not inspect or tap the ANR dialog through UIAutomator: that would register
-  # UiTestAutomationService and reintroduce the suspected conflict.
+  # Do not use UIAutomator: it can take over Accessibility and unbind MyAI.
+  # If Android presents its system ANR dialog, preserve evidence and tap the
+  # visible "Wait" row using screen-relative coordinates, then verify recovery.
   if ! anr_window_visible; then
     dialog_recovered=0
     return 0
   fi
   dialog_recovered=1
-  echo "FAIL: Android ANR overlay detected; preserving evidence without UIAutomator." >&2
+  echo "WARNING: Android system ANR overlay detected; saving evidence and choosing Wait." >&2
   adb shell dumpsys accessibility > "$EVIDENCE/anr-accessibility.txt" 2>&1 || true
   adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
-  capture_failure_evidence anr
+  local size w h x y attempt
+  size="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  [[ "$size" =~ ^([0-9]+)x([0-9]+)$ ]] || return 1
+  w="${BASH_REMATCH[1]}"
+  h="${BASH_REMATCH[2]}"
+  # Android 14's standard system ANR dialog places "Wait" near 47% screen height.
+  x="$((w * 42 / 100))"
+  y="$((h * 47 / 100))"
+  for attempt in 1 2; do
+    echo "Selecting Wait on Android ANR dialog (attempt $attempt)"
+    adb shell input tap "$x" "$y" || true
+    for _ in $(seq 1 10); do
+      sleep 2
+      if ! anr_window_visible; then
+        echo "System ANR dialog dismissed; allowing Android to settle."
+        sleep 4
+        return 0
+      fi
+    done
+  done
+  echo "FAIL: Android system ANR dialog remained visible after Wait attempts." >&2
   return 1
 }
 
@@ -322,8 +343,9 @@ fi
 # accessibility framework and can make the label stale/disconnected by design.
 # The authoritative check is the framework's bound-service list.
 wait_for_accessibility_bound 20 || fail "Control Bridge is not bound after UI assertions"
-# Exercise the in-app tool protocol and screen-state command by tapping controls
-# using their actual resource IDs and bounds from the Android accessibility tree.
+# Exercise the in-app tool protocol using screen-relative coordinates calibrated
+# against the saved 1080x1920 screenshot. Accessibility hierarchy dumps are avoided
+# because UiAutomation can interfere with the service being tested.
 tap_resource() {
   local resource_id="$1" screen_size screen_w screen_h density row_y x
   recover_unresponsive_dialog || fail "Android ANR overlay detected before tapping $resource_id"
@@ -333,8 +355,10 @@ tap_resource() {
   screen_w="${BASH_REMATCH[1]}"
   screen_h="${BASH_REMATCH[2]}"
   [[ "$density" =~ ^[0-9]+$ ]] || density=420
-  # Diagnostics row sits above the fixed 96dp action-log panel.
-  row_y="$((screen_h - (144 * density / 160)))"
+  # The diagnostics controls are at about 65% of screen height on the
+  # actual app layout. Do not derive this from the bottom: the previous 144dp
+  # formula landed inside empty space and missed every test button.
+  row_y="$((screen_h * 65 / 100))"
 
   case "$resource_id" in
     testScreen)
