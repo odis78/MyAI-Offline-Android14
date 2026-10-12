@@ -39,6 +39,23 @@ capture_anr_traces() {
   fi
 }
 
+# UiAutomator's UiTestAutomationService temporarily takes over Android's
+# accessibility framework and can unbind ordinary AccessibilityServices.
+# Wait on dumpsys (not another UIAutomator call) for MyAI to be bound again.
+wait_for_accessibility_bound() {
+  local attempts="${1:-20}" state
+  for attempt in $(seq 1 "$attempts"); do
+    state="$(adb shell dumpsys accessibility 2>/dev/null || true)"
+    if printf '%s\n' "$state" | grep -A 8 'Bound services:' | grep -Fq "$PKG"; then
+      printf '%s\n' "$state" > "$EVIDENCE/accessibility-bound-current.txt"
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$state" > "$EVIDENCE/accessibility-not-bound.txt"
+  return 1
+}
+
 capture_failure_evidence() {
   local tag="${1:-failure}"
   # Preserve device connectivity evidence before recovery or restarts can overwrite it.
@@ -117,9 +134,10 @@ adb shell dumpsys activity processes > "$EVIDENCE/processes-pre-accessibility.tx
 grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:|com\\.dmitry\\.myai\\.infinix' "$EVIDENCE/logcat-pre-accessibility.txt" > "$EVIDENCE/anr-summary-pre-accessibility.txt" 2>/dev/null || true
 if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_server)|Application Not Responding: (system|System UI|Settings)' "$EVIDENCE/logcat-pre-accessibility.txt" "$EVIDENCE/windows-pre-accessibility.txt" "$EVIDENCE/lastanr-pre-accessibility.txt"; then
   echo "WARNING: System/UI ANR signature already exists before Accessibility is enabled; preserve as baseline evidence."
-  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement.
-  # Capture thread traces before reboot can remove the original ANR evidence.
-  capture_anr_traces pre-accessibility" > "$EVIDENCE/pre-accessibility-anr-marker.txt"
+  # Preserve the original ANR files before reboot; shell access may be denied,
+  # but the bugreport attempt and permission errors are still captured.
+  capture_anr_traces pre-accessibility
+  printf '%s\n' "System/UI ANR signature detected before Accessibility enablement." > "$EVIDENCE/pre-accessibility-anr-marker.txt"
   # The baseline already shows a system ANR before MyAI Accessibility is enabled.
   # Reboot once to avoid testing the agent on a known-unhealthy framework state.
   echo "Rebooting emulator once after pre-Accessibility system ANR"
@@ -237,6 +255,15 @@ echo "Accessibility setting enabled: $enabled"
 echo "Accessibility services setting: $services"
 adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-launch.txt" 2>&1 || true
 
+# Verify the actual framework binding before starting UIAutomator. A hierarchy
+# dump itself registers UiTestAutomationService and can unbind MyAI temporarily.
+if ! wait_for_accessibility_bound 30; then
+  adb shell dumpsys accessibility > "$EVIDENCE/accessibility-bind-timeout.txt" 2>&1 || true
+  adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-bind-timeout.txt" 2>&1 || true
+  fail "AccessibilityManager did not bind MyAI after settings were enabled"
+fi
+echo "Accessibility framework confirms MyAI is bound"
+
 echo "Launching MainActivity for UI assertions"
 start_output="$(adb shell am start -n "$ACTIVITY" 2>&1 || true)"
 printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
@@ -257,6 +284,12 @@ dump_ui() {
     # adb pull may silently reuse stale XML and falsely report every app control missing.
     adb shell rm -f /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
     output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
+    # Release of UiAutomation is asynchronous; wait for MyAI's service to bind
+    # again before tapping controls that invoke Accessibility-backed tools.
+    if ! wait_for_accessibility_bound 20; then
+      echo "MyAI Accessibility service did not rebind after UI hierarchy dump"
+      continue
+    fi
     if printf '%s' "$output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
        adb shell test -s /data/local/tmp/myai-window.xml >/dev/null 2>&1; then
       if adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1; then
@@ -441,40 +474,10 @@ if [[ "$connected" -ne 1 ]]; then
 fi
 
 
-# Require the status node itself to show the connected state; action logs can quote stale text.
-status_ok=0
-for attempt in $(seq 1 15); do
-  recover_unresponsive_dialog || fail "Android system ANR recovery failed while waiting for connected Bridge status"
-  adb shell rm -f /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
-  dump_output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
-  if printf '%s' "$dump_output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
-     adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1 &&
-     python3 - "$EVIDENCE/window.xml" <<'PY'
-import sys, re
-xml = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-connected = (
-    r'text="Control Bridge: ПОДКЛЮЧЕН"[^>]*resource-id="[^"]*:id/status"',
-    r'resource-id="[^"]*:id/status"[^>]*text="Control Bridge: ПОДКЛЮЧЕН"',
-)
-disconnected = (
-    r'text="Control Bridge: НЕ ПОДКЛЮЧЕН"[^>]*resource-id="[^"]*:id/status"',
-    r'resource-id="[^"]*:id/status"[^>]*text="Control Bridge: НЕ ПОДКЛЮЧЕН"',
-)
-if any(re.search(p, xml) for p in disconnected):
-    raise SystemExit(1)
-if any(re.search(p, xml) for p in connected):
-    raise SystemExit(0)
-raise SystemExit(1)
-PY
-  then
-    status_ok=1
-    break
-  fi
-  echo "Control Bridge label is not connected yet (attempt $attempt)"
-  sleep 1
-done
-[[ "$status_ok" -eq 1 ]] || fail "Control Bridge status stayed disconnected after SERVICE CONNECTED"
-
+# Do not assert the live status label using UiAutomator: that API takes over the
+# accessibility framework and can make the label stale/disconnected by design.
+# The authoritative check is the framework's bound-service list.
+wait_for_accessibility_bound 20 || fail "Control Bridge is not bound after UI assertions"
 # Exercise the in-app tool protocol and screen-state command by tapping controls
 # using their actual resource IDs and bounds from the Android accessibility tree.
 tap_resource() {
