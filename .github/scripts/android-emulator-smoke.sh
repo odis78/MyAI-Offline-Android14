@@ -149,7 +149,23 @@ if grep -Eiq 'ANR in (com[.]android\\.systemui|com[.]android\\.settings|system_s
   # The baseline already shows a system ANR before MyAI Accessibility is enabled.
   # Reboot once to avoid testing the agent on a known-unhealthy framework state.
   echo "Rebooting emulator once after pre-Accessibility system ANR"
-  adb reboot || fail "Could not reboot emulator after pre-Accessibility system ANR"
+  # A system ANR can also leave the adb transport/daemon temporarily unusable.
+  # Retry the transport once before declaring the reboot unrecoverable.
+  if ! adb reboot; then
+    echo "First adb reboot request failed; restarting adb server and retrying transport"
+    adb kill-server >/dev/null 2>&1 || true
+    sleep 2
+    adb start-server >/dev/null 2>&1 || true
+    if ! adb wait-for-device; then
+      adb devices -l > "$EVIDENCE/adb-devices-reboot-recovery.txt" 2>&1 || true
+      fail "Emulator did not reconnect after adb server recovery for ANR reboot"
+    fi
+    # If the device is still fully booted, the first reboot did not take effect.
+    boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+    if [[ "$boot_state" == "1" ]]; then
+      adb reboot || fail "Could not reboot emulator after adb server recovery"
+    fi
+  fi
   adb wait-for-device || fail "Emulator did not reconnect after pre-Accessibility ANR reboot"
   rebooted=0
   for attempt in $(seq 1 90); do
