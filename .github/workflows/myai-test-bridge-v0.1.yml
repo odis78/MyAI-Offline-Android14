@@ -62,7 +62,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-boot-timeout: 900
-          disable-animations: false
+          disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: |
             mkdir -p test-bridge/clean-baseline-evidence
@@ -117,7 +117,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-boot-timeout: 900
-          disable-animations: false
+          disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
       - name: Analyze Android failure evidence
