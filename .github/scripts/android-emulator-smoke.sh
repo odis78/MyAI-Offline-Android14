@@ -215,40 +215,13 @@ fi
 # Dump actual UI hierarchy. Some emulator images report exit code 0 even when
 # uiautomator did not create the target file, so verify the file before pulling.
 dump_ui() {
-  local output=""
-  for attempt in $(seq 1 5); do
-    # Remove any previous hierarchy first: uiautomator can fail to dump while
-    # the remote file from an earlier ANR dialog still exists. Without this,
-    # adb pull may silently reuse stale XML and falsely report every app control missing.
-    adb shell rm -f /data/local/tmp/myai-window.xml >/dev/null 2>&1 || true
-    output="$(adb shell uiautomator dump /data/local/tmp/myai-window.xml 2>&1 | tr -d '\r' || true)"
-    # Release of UiAutomation is asynchronous; wait for MyAI's service to bind
-    # again before tapping controls that invoke Accessibility-backed tools.
-    if ! wait_for_accessibility_bound 20; then
-      echo "MyAI Accessibility service did not rebind after UI hierarchy dump"
-      # API 34 headless emulators can raise a system/phone ANR between the
-      # pre-dump check and this retry. In that case UiTestAutomationBridge
-      # returns a null root and temporarily displaces MyAI's accessibility
-      # binding. Re-check WindowManager and recover the overlay before retrying.
-      if declare -F recover_unresponsive_dialog >/dev/null 2>&1; then
-        if anr_window_visible; then
-          echo "ANR overlay appeared during UI dump; attempting bounded recovery"
-          recover_unresponsive_dialog || echo "ANR recovery did not complete during UI dump; preserving evidence and retrying"
-        fi
-      fi
-      continue
-    fi
-    if printf '%s' "$output" | grep -Fq '/data/local/tmp/myai-window.xml' &&
-       adb shell test -s /data/local/tmp/myai-window.xml >/dev/null 2>&1; then
-      if adb pull /data/local/tmp/myai-window.xml "$EVIDENCE/window.xml" >/dev/null 2>&1; then
-        return 0
-      fi
-    fi
-    echo "UI hierarchy dump attempt $attempt did not produce a readable file: $output"
-    sleep 2
-  done
-  fail "Could not create and pull Android UI hierarchy; last uiautomator output: $output"
+  # Avoid UIAutomator/UIAutomation: it can take over Accessibility and interfere
+  # with the service being tested. Keep a screenshot as UI evidence instead.
+  adb exec-out screencap -p > "$EVIDENCE/screenshot-current.png" 2>/dev/null ||
+    return 1
+  [[ -s "$EVIDENCE/screenshot-current.png" ]]
 }
+
 # Headless API 34 emulators can become overloaded and show a system/Settings
 # "isn't responding" dialog. Such a dialog overlays app controls; UIAutomator may
 # still expose the obscured controls, so tapping their coordinates would hit the
@@ -262,82 +235,18 @@ anr_window_visible() {
 }
 
 recover_unresponsive_dialog() {
-  dialog_recovered=0
-  local focused=""
-  focused="$(adb shell dumpsys window windows 2>/dev/null | grep -E 'mCurrentFocus|mFocusedWindow' | tail -n 4 || true)"
-  if ! printf '%s\n' "$focused" | grep -Eiq 'Application Not Responding: (system|Settings|System UI)|mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding'; then
-    # A dialog can appear between the focus snapshot and this check. The app
-    # hierarchy alone is not authoritative for overlays, so query WindowManager again.
-    anr_window_visible || return 0
+  # Do not inspect or tap the ANR dialog through UIAutomator: that would register
+  # UiTestAutomationService and reintroduce the suspected conflict.
+  if ! anr_window_visible; then
+    dialog_recovered=0
+    return 0
   fi
-
-  echo "Android ANR overlay detected from WindowManager; focused-window evidence:"
-  # Save diagnostics before any key events or relaunch attempts.
-  capture_failure_evidence anr
-  printf '%s\n' "$focused" | tee "$EVIDENCE/anr-focused-window.txt"
+  dialog_recovered=1
+  echo "FAIL: Android ANR overlay detected; preserving evidence without UIAutomator." >&2
+  adb shell dumpsys accessibility > "$EVIDENCE/anr-accessibility.txt" 2>&1 || true
   adb shell dumpsys window windows > "$EVIDENCE/anr-window-manager.txt" 2>&1 || true
   adb exec-out screencap -p > "$EVIDENCE/anr-overlay.png" 2>/dev/null || true
-
-  # Prefer tapping Android's actual "Wait" button by its accessibility bounds.
-  # DPAD navigation is unreliable when system_server itself is overloaded, and
-  # ENTER without verified focus could select "Close app".
-  dialog_recovered=1
-  wait_tapped=0
-  for tap_attempt in $(seq 1 3); do
-    adb shell rm -f /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 || true
-    adb shell uiautomator dump /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 || true
-    if adb shell test -s /data/local/tmp/myai-anr-dialog.xml >/dev/null 2>&1 &&
-       adb pull /data/local/tmp/myai-anr-dialog.xml "$EVIDENCE/window-anr-dialog.xml" >/dev/null 2>&1; then
-      wait_bounds="$(python3 - "$EVIDENCE/window-anr-dialog.xml" <<'PY'
-import sys, xml.etree.ElementTree as ET, re
-try:
-    root=ET.parse(sys.argv[1]).getroot()
-except Exception:
-    raise SystemExit(1)
-for node in root.iter('node'):
-    rid=node.attrib.get('resource-id','')
-    if rid in ('android:id/aerr_wait', 'com.android.systemui:id/aerr_wait') or rid.endswith(':id/aerr_wait'):
-        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',node.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2=map(int,m.groups())
-            if x2>x1 and y2>y1:
-                print((x1+x2)//2, (y1+y2)//2)
-                raise SystemExit(0)
-raise SystemExit(1)
-PY
-)" || true
-      if [[ -n "$wait_bounds" ]]; then        read -r wait_x wait_y <<< "$wait_bounds"
-        echo "Tapping verified Android ANR 'Wait' button at $wait_x,$wait_y"
-        adb shell input tap "$wait_x" "$wait_y" >/dev/null 2>&1 || true
-        wait_tapped=1
-        break
-      fi
-    fi
-    sleep 1
-  done
-  if [[ "$wait_tapped" -ne 1 ]]; then
-    echo "Could not resolve the Android 'Wait' button bounds; using bounded DPAD fallback"
-    adb shell input keyevent KEYCODE_DPAD_DOWN >/dev/null 2>&1 || true
-    sleep 1
-    adb shell input keyevent KEYCODE_ENTER >/dev/null 2>&1 || true
-  fi
-  for attempt in $(seq 1 12); do
-    sleep 2
-    if ! anr_window_visible; then
-      echo "ANR overlay dismissed; waiting for system services to settle"
-      sleep 4
-      adb shell am start -n "$ACTIVITY" >/dev/null 2>&1 || true
-      sleep 3
-      dump_ui || return 1
-      return 0
-    fi
-    # If ENTER did not select Wait, BACK dismisses the dialog on some API 34 images.
-    if [[ "$attempt" -eq 4 ]]; then
-      adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
-    fi
-  done
-  echo "ANR overlay remains focused after recovery attempts" >&2
-  adb shell dumpsys accessibility > "$EVIDENCE/anr-accessibility.txt" 2>&1 || true
+  capture_failure_evidence anr
   return 1
 }
 
@@ -353,26 +262,13 @@ recover_unresponsive_dialog || fail "Android system ANR overlay could not be dis
 dump_ui
 
 ui_has_expected_controls() {
-  python3 - "$EVIDENCE/window.xml" <<'PY'
-import sys, xml.etree.ElementTree as ET
-root = ET.parse(sys.argv[1]).getroot()
-texts = [node.attrib.get("text", "").casefold() for node in root.iter("node")]
-joined = "\n".join(texts)
-expected = [
-    "myai",
-    "тест: домой",
-    "тест: назад",
-    "тест: прочитать экран",
-    "тест: tool protocol",
-    "тест: прокрутка вниз",
-    "тест: прокрутка вверх",
-    "журнал действий",
-]
-missing = [item for item in expected if item.casefold() not in joined]
-if missing:
-    print("Missing UI text after Unicode case normalization: " + ", ".join(missing), file=sys.stderr)
-    raise SystemExit(1)
-PY
+  # No hierarchy dump while Accessibility is enabled. Validate foreground
+  # Activity, screenshot capture, and framework binding instead.
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-ui-check.txt" 2>&1 || return 1
+  grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-ui-check.txt" |
+    grep -Fq "$ACTIVITY" || return 1
+  [[ -s "$EVIDENCE/screenshot-current.png" ]] || return 1
+  wait_for_accessibility_bound 5
 }
 
 ui_ready=0
@@ -429,92 +325,39 @@ wait_for_accessibility_bound 20 || fail "Control Bridge is not bound after UI as
 # Exercise the in-app tool protocol and screen-state command by tapping controls
 # using their actual resource IDs and bounds from the Android accessibility tree.
 tap_resource() {
-  local resource_id="$1"
-  local bounds=""
-  recover_unresponsive_dialog || fail "Could not recover from emulator unresponsive dialog before tapping $resource_id"
-  # Controls are inside the upper controlScroll. Earlier test actions can leave
-  # later buttons below the visible viewport, so scroll that container until
-  # the requested resource ID appears instead of failing on a valid off-screen node.
-  for attempt in $(seq 1 12); do
-    dump_ui || fail "UI dump failed before tap $resource_id"
-    bounds="$(python3 - "$EVIDENCE/window.xml" "$resource_id" <<'PY'
-import sys, xml.etree.ElementTree as ET, re
-root=ET.parse(sys.argv[1]).getroot()
-target=sys.argv[2]
-for n in root.iter('node'):
-    if n.attrib.get('resource-id','').endswith(':id/'+target):
-        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2=map(int,m.groups())
-            if x2 > x1 and y2 > y1:
-                print((x1+x2)//2, (y1+y2)//2)
-                raise SystemExit(0)
-raise SystemExit(1)
-PY
-)" || true
-    if [[ -n "$bounds" ]]; then break; fi
-    container_bounds="$(python3 - "$EVIDENCE/window.xml" <<'PY'
-import sys, xml.etree.ElementTree as ET, re
-root=ET.parse(sys.argv[1]).getroot()
-for n in root.iter('node'):
-    if n.attrib.get('resource-id','').endswith(':id/controlScroll'):
-        m=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2=map(int,m.groups())
-            print(x1,y1,x2,y2)
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
-)" || true
-    if [[ -n "$container_bounds" ]]; then
-      read -r x1 y1 x2 y2 <<< "$container_bounds"
-      swipe_x="$(((x1+x2)/2))"
-      swipe_start="$((y2-40))"
-      swipe_end="$((y1+40))"
-    else
-      # Some Android 14 UIAutomator dumps omit the ScrollView node even though
-      # its child controls are present. Fall back to a swipe within the upper
-      # control area, not the lower action-log viewport.
-      screen_size="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | tail -n 1 || true)"
-      if [[ "$screen_size" =~ ^([0-9]+)x([0-9]+)$ ]]; then
-        screen_w="${BASH_REMATCH[1]}"
-        screen_h="${BASH_REMATCH[2]}"
-        swipe_x="$((screen_w/2))"
-        swipe_start="$((screen_h*48/100))"
-        swipe_end="$((screen_h*18/100))"
-        echo "controlScroll node missing from UI hierarchy; using bounded upper-area swipe fallback"
-      else
-        fail "Control container and emulator screen dimensions unavailable while searching for $resource_id"
-      fi
-    fi
-    # Try both scroll directions. A prior action can leave the viewport either
-    # above or below the target; always swiping only upward can miss a valid node.
-    if (( attempt % 2 == 0 )); then
-      adb shell input swipe "$swipe_x" "$swipe_end" "$swipe_x" "$swipe_start" 350
-      echo "Searching $resource_id: swipe toward earlier controls (attempt $attempt)"
-    else
-      adb shell input swipe "$swipe_x" "$swipe_start" "$swipe_x" "$swipe_end" 350
-      echo "Searching $resource_id: swipe toward later controls (attempt $attempt)"
-    fi
-    sleep 1
-  done
-  if [[ -z "$bounds" ]]; then
-    python3 - "$EVIDENCE/window.xml" "$EVIDENCE/missing-control-tree.txt" <<'PY'
-import sys, xml.etree.ElementTree as ET
-root=ET.parse(sys.argv[1]).getroot()
-with open(sys.argv[2], "w", encoding="utf-8") as out:
-    for n in root.iter("node"):
-        rid=n.attrib.get("resource-id","")
-        text=n.attrib.get("text","")
-        desc=n.attrib.get("content-desc","")
-        if rid or text or desc:
-            out.write(f"resource-id={rid!r} text={text!r} content-desc={desc!r} bounds={n.attrib.get('bounds','')}\n")
-PY
-    fail "Control not found after bidirectional scrolling: $resource_id"
-  fi
-  read -r x y <<< "$bounds"
-  adb shell input tap "$x" "$y"
+  local resource_id="$1" screen_size screen_w screen_h density row_y x
+  recover_unresponsive_dialog || fail "Android ANR overlay detected before tapping $resource_id"
+  screen_size="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  density="$(adb shell wm density 2>/dev/null | grep -oE '[0-9]+' | tail -n 1 || true)"
+  [[ "$screen_size" =~ ^([0-9]+)x([0-9]+)$ ]] || fail "Cannot determine emulator screen dimensions"
+  screen_w="${BASH_REMATCH[1]}"
+  screen_h="${BASH_REMATCH[2]}"
+  [[ "$density" =~ ^[0-9]+$ ]] || density=420
+  # Diagnostics row sits above the fixed 96dp action-log panel.
+  row_y="$((screen_h - (144 * density / 160)))"
+
+  case "$resource_id" in
+    testScreen)
+      x="$((screen_w * 52 / 100))"
+      ;;
+    testTool)
+      adb shell input swipe "$((screen_w * 15 / 100))" "$row_y" "$((screen_w * 85 / 100))" "$row_y" 300
+      sleep 1
+      x="$((screen_w * 78 / 100))"
+      ;;
+    testScrollUp)
+      adb shell input swipe "$((screen_w * 85 / 100))" "$row_y" "$((screen_w * 15 / 100))" "$row_y" 300
+      sleep 1
+      x="$((screen_w * 78 / 100))"
+      ;;
+    *)
+      fail "Unsupported coordinate-based test control: $resource_id"
+      ;;
+  esac
+  echo "Tapping $resource_id by screen-relative coordinates ($x,$row_y), without UIAutomator"
+  adb shell input tap "$x" "$row_y"
   sleep 2
+  dump_ui || fail "Could not capture screenshot after tapping $resource_id"
 }
 
 # Tool dispatch runs on the app's single-thread executor. On a slow or ANR-affected
@@ -546,7 +389,7 @@ recover_unresponsive_dialog || fail "Could not recover from emulator dialog befo
 tap_resource "testScreen"
 wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success (see explicit tool result/timeout above)"
 dump_ui || fail "UI dump failed after screen-state test"
-cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
+cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-screen.png"
 # UI labels or results can vary; require the app to remain foreground and capture the output.
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
@@ -577,7 +420,7 @@ for attempt in $(seq 1 12); do
 done
 [[ "$home_ok" -eq 1 ]] || fail "Tool protocol home command did not report success after dialog recovery/retry"
 dump_ui || fail "UI dump failed after tool protocol test"
-cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-tool.xml"
+cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
 adb logcat -d -t 8000 > "$EVIDENCE/logcat.txt"
