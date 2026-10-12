@@ -2,96 +2,104 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
-
-    <ScrollView
-        android:id="@+id/controlScroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1.15"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="MyAI — Инфиникс"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="12dp" />
-
-            <Button
-                android:id="@+id/accessibility"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Открыть специальные возможности" />
-
-            <Button
-                android:id="@+id/testHome"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Домой" />
-
-            <Button
-                android:id="@+id/testBack"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Назад" />
-
-            <Button
-                android:id="@+id/testScreen"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Прочитать экран" />
-
-            <Button
-                android:id="@+id/testTool"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Tool Protocol (Home)" />
-
-            <Button
-                android:id="@+id/testScroll"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Прокрутка вниз" />
-
-            <Button
-                android:id="@+id/testScrollUp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Тест: Прокрутка вверх" />
-        </LinearLayout>
-    </ScrollView>
+    android:padding="12dp">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="6dp"
-        android:text="Журнал действий"
+        android:text="MyAI — Инфиникс"
+        android:textSize="24sp"
         android:textStyle="bold" />
 
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:text="Control Bridge: проверка..." />
+
+    <Button
+        android:id="@+id/accessibility"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Открыть специальные возможности" />
+
     <ScrollView
-        android:id="@+id/logScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true">
 
         <TextView
+            android:id="@+id/chat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:textSize="16sp"
+            android:text="MyAI готов к работе." />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/commandInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Напиши команду..."
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences"
+            android:maxLines="3" />
+
+        <Button
+            android:id="@+id/sendCommand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Отправить" />
+    </LinearLayout>
+
+    <details xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+    </details>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Тесты и журнал диагностики ниже"
+        android:textStyle="bold"
+        android:paddingTop="4dp" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/testHome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Домой" />
+            <Button android:id="@+id/testBack" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Назад" />
+            <Button android:id="@+id/testScreen" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Читать экран" />
+            <Button android:id="@+id/testTool" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tool Home" />
+            <Button android:id="@+id/testScroll" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Вниз" />
+            <Button android:id="@+id/testScrollUp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Вверх" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <ScrollView
+        android:id="@+id/logScroll"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:fillViewport="true">
+        <TextView
             android:id="@+id/log"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="4dp"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </ScrollView>
 </LinearLayout>
