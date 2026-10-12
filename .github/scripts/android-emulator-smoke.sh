@@ -615,6 +615,9 @@ wait_for_tool_result() {
   return 1
 }
 
+# A system ANR overlay can obscure the app while UiAutomator still returns the
+# underlying app hierarchy. Recover it before tapping any Accessibility-backed tool.
+recover_unresponsive_dialog || fail "Could not recover from emulator dialog before screen-state test"
 tap_resource "testScreen"
 wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success (see explicit tool result/timeout above)"
 dump_ui || fail "UI dump failed after screen-state test"
@@ -623,6 +626,7 @@ cp "$EVIDENCE/window.xml" "$EVIDENCE/window-after-screen.xml"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
+recover_unresponsive_dialog || fail "Could not recover from emulator dialog before scroll-up test"
 tap_resource "testScrollUp"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
 
