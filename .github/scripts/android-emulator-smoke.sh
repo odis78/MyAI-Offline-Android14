@@ -381,6 +381,17 @@ tap_resource() {
   echo "Tapping $resource_id by screen-relative coordinates ($x,$row_y), without UIAutomator"
   adb shell input tap "$x" "$row_y"
   sleep 2
+  # The system ANR can appear immediately after a tap. Previously we checked
+  # only before tapping, so a new dialog could intercept the request entirely.
+  if anr_window_visible; then
+    echo "ANR overlay appeared after tapping $resource_id; recover and retry once." >&2
+    recover_unresponsive_dialog || fail "Could not recover ANR overlay after tapping $resource_id"
+    adb shell am start -n "$ACTIVITY" >/dev/null 2>&1 || true
+    sleep 3
+    adb shell input tap "$x" "$row_y"
+    sleep 2
+    recover_unresponsive_dialog || fail "ANR overlay reappeared after retrying $resource_id"
+  fi
   dump_ui || fail "Could not capture screenshot after tapping $resource_id"
 }
 
@@ -390,7 +401,9 @@ tap_resource() {
 # delayed execution as a broken tool.
 wait_for_tool_result() {
   local tool="$1" expected="$2" line=""
-  for attempt in $(seq 1 15); do
+  for attempt in $(seq 1 30); do
+    # Give the bridge time to respond after recovering a system-level ANR.
+    recover_unresponsive_dialog || return 1
     line="$(adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -F "TOOL_RESULT ${tool}:" | tail -n 1 || true)"
     if [[ -n "$line" ]]; then
       echo "Observed tool result: $line"
