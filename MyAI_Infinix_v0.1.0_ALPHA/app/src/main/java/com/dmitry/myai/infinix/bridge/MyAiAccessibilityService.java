@@ -10,12 +10,23 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import android.view.accessibility.AccessibilityEvent;
+import android.content.Intent;
 
 public class MyAiAccessibilityService extends AccessibilityService {
     private static volatile MyAiAccessibilityService instance;
+    // Tracks the last external app so Back from MyAI can return to it.
+    private static volatile String lastExternalPackage;
     public static boolean isConnected(){ return instance != null; }
     @Override public void onServiceConnected(){ instance=this; log("SERVICE CONNECTED — INFINIX ALPHA"); }
-    @Override public void onAccessibilityEvent(AccessibilityEvent e){}
+    @Override public void onAccessibilityEvent(AccessibilityEvent e){
+        if (e == null || e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        CharSequence packageName = e.getPackageName();
+        if (packageName == null) return;
+        String candidate = packageName.toString();
+        if (candidate.isEmpty() || candidate.equals(getPackageName())) return;
+        lastExternalPackage = candidate;
+        log("FOREGROUND_APP_TRACKED package=" + candidate);
+    }
     @Override public void onInterrupt(){ log("SERVICE INTERRUPTED"); }
     @Override public void onDestroy(){ if(instance==this) instance=null; super.onDestroy(); }
     public static AccessibilityNodeInfo root(){ return instance==null?null:instance.getRootInActiveWindow(); }
@@ -25,7 +36,29 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return root==null?null:root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
     }
     public static void home(){ require().performGlobalAction(GLOBAL_ACTION_HOME); }
-    public static void back(){ require().performGlobalAction(GLOBAL_ACTION_BACK); }
+    public static void back(){
+        MyAiAccessibilityService service = require();
+        String previousPackage = lastExternalPackage;
+        if (previousPackage != null && !previousPackage.isEmpty()
+                && !previousPackage.equals(service.getPackageName())) {
+            try {
+                Intent launch = service.getPackageManager().getLaunchIntentForPackage(previousPackage);
+                if (launch != null) {
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                    service.startActivity(launch);
+                    log("BACK_RETURN_TO_PREVIOUS_APP package=" + previousPackage);
+                    return;
+                }
+                log("BACK_PREVIOUS_APP_NO_LAUNCH_INTENT package=" + previousPackage);
+            } catch (RuntimeException ex) {
+                log("BACK_PREVIOUS_APP_FAILED package=" + previousPackage
+                        + " error=" + ex.getClass().getSimpleName());
+            }
+        }
+        if (!service.performGlobalAction(GLOBAL_ACTION_BACK)) {
+            throw new IllegalStateException("Back global action was rejected by Android");
+        }
+    }
     public static void recents(){ require().performGlobalAction(GLOBAL_ACTION_RECENTS); }
     public static void scrollDown(){
         MyAiAccessibilityService s=require();
