@@ -19,6 +19,8 @@ public class MyAiAccessibilityService extends AccessibilityService {
     private static volatile MyAiAccessibilityService instance;
     private static final List<ConnectionListener> listeners = new CopyOnWriteArrayList<>();
     private static final AtomicInteger connectCount = new AtomicInteger();
+    // Keep the most recently visible non-MyAI app so Back from the command UI can return to it.
+    private static volatile String lastExternalPackage;
     public static boolean isConnected(){ return instance != null; }
     public static void addConnectionListener(ConnectionListener listener){
         listeners.add(listener);
@@ -37,7 +39,15 @@ public class MyAiAccessibilityService extends AccessibilityService {
                 : "SERVICE REBOUND — INFINIX ALPHA count=" + count);
         publish();
     }
-    @Override public void onAccessibilityEvent(AccessibilityEvent e){}
+    @Override public void onAccessibilityEvent(AccessibilityEvent e) {
+        if (e == null || e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        CharSequence packageName = e.getPackageName();
+        if (packageName == null) return;
+        String candidate = packageName.toString();
+        if (candidate.isEmpty() || candidate.equals(getPackageName())) return;
+        lastExternalPackage = candidate;
+        log("FOREGROUND_APP_TRACKED package=" + candidate);
+    }
     @Override public void onInterrupt(){ log("SERVICE INTERRUPTED"); }
     @Override public boolean onUnbind(Intent intent){
         if(instance==this) instance=null;
@@ -58,7 +68,29 @@ public class MyAiAccessibilityService extends AccessibilityService {
         return root==null?null:root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
     }
     public static void home(){ performGlobalActionChecked(GLOBAL_ACTION_HOME, "Home"); }
-    public static void back(){ performGlobalActionChecked(GLOBAL_ACTION_BACK, "Back"); }
+    public static void back() {
+        MyAiAccessibilityService service = require();
+        String previousPackage = lastExternalPackage;
+        if (previousPackage != null && !previousPackage.isEmpty()
+                && !previousPackage.equals(service.getPackageName())) {
+            Intent launch = service.getPackageManager().getLaunchIntentForPackage(previousPackage);
+            if (launch != null) {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                try {
+                    service.startActivity(launch);
+                    log("BACK_RETURN_TO_PREVIOUS_APP package=" + previousPackage);
+                    return;
+                } catch (RuntimeException e) {
+                    log("BACK_PREVIOUS_APP_FAILED package=" + previousPackage
+                            + " error=" + e.getClass().getSimpleName());
+                }
+            } else {
+                log("BACK_PREVIOUS_APP_NO_LAUNCH_INTENT package=" + previousPackage);
+            }
+        }
+        // No known external app: preserve Android's native Back behavior.
+        performGlobalActionChecked(GLOBAL_ACTION_BACK, "Back");
+    }
     public static void recents(){ performGlobalActionChecked(GLOBAL_ACTION_RECENTS, "Recents"); }
 
     private static void performGlobalActionChecked(int action, String label) {
