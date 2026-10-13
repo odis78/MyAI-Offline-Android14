@@ -52,19 +52,32 @@ public class MainActivity extends Activity {
         MyAiAccessibilityService.addConnectionListener(connectionListener);
         updateBridgeStatus();
         addChat("MyAI", "Чат команд готов. Примеры: «назад», «домой», «прокрути вниз», «прочитай экран», «открой YouTube». Для управления телефоном включи службу специальных возможностей.");
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onCreate hasExtra=" + getIntent().hasExtra("myai_test_tool"));
         scheduleSmokeTool(getIntent());
     }
 
     private void scheduleSmokeTool(Intent intent) {
-        if (intent == null) return;
+        if (intent == null) {
+            android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE schedule skipped: null intent");
+            return;
+        }
         String smokeTool = intent.getStringExtra("myai_test_tool");
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE schedule received tool=" + smokeTool
+                + " action=" + intent.getAction());
         if (smokeTool == null || smokeTool.trim().isEmpty()) return;
-        statusHandler.postDelayed(() -> runTool(tool(smokeTool.trim(), "{}")), 1500);
+        String requestedTool = smokeTool.trim();
+        statusHandler.postDelayed(() -> {
+            android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE dispatch tool=" + requestedTool
+                    + " bridgeConnected=" + MyAiAccessibilityService.isConnected());
+            runTool(tool(requestedTool, "{}"));
+        }, 1500);
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onNewIntent hasExtra="
+                + (intent != null && intent.hasExtra("myai_test_tool")));
         scheduleSmokeTool(intent);
     }
 
@@ -150,6 +163,7 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> { if (chat != null && !destroyed) chat.append(who + ": " + text + "\n\n"); });
     }
     void runTool(String json) {
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE runTool queued");
         commandExecutor.execute(() -> {
             try {
                 var r = agent.dispatchJson(json);
@@ -157,7 +171,11 @@ public class MainActivity extends Activity {
                 append(result);
                 addChat("MyAI", result);
                 android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
-            } catch (Exception e) { append("TOOL ERROR: " + e.getMessage()); }
+            } catch (Exception e) {
+                android.util.Log.e("MyAI-Infinix", "TOOL_ERROR " + e.getClass().getName()
+                        + ": " + e.getMessage(), e);
+                append("TOOL ERROR: " + e.getMessage());
+            }
         });
     }
     void append(String s) {
