@@ -69,11 +69,19 @@ public final class ToolExecutor {
     }
 
     private ToolResult screenState() {
+        long traceStart = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE B root-request-begin thread="
+            + Thread.currentThread().getName());
         AccessibilityNodeInfo root = MyAiAccessibilityService.root();
+        android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE B root-request-end rootNull="
+            + (root == null) + " elapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traceStart));
         if (root == null) return ToolResult.fail("get_screen_state", "no active accessibility root");
         try {
             List<String> nodes = new ArrayList<>();
+            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-begin");
             collect(root, nodes, 0);
+            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-end nodeCount="
+                + nodes.size() + " elapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traceStart));
             StringBuilder json = new StringBuilder("{\"elements\":[");
             for (int i = 0; i < nodes.size(); i++) {
                 if (i > 0) json.append(',');
