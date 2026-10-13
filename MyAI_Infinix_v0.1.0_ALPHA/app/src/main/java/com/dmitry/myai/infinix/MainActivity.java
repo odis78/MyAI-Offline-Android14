@@ -66,10 +66,17 @@ public class MainActivity extends Activity {
                 + " action=" + intent.getAction());
         if (smokeTool == null || smokeTool.trim().isEmpty()) return;
         String requestedTool = smokeTool.trim();
+        String requestedArgs = intent.getStringExtra("myai_test_args");
+        if (requestedArgs == null || requestedArgs.trim().isEmpty()) requestedArgs = "{}";
+        final String smokeArgs = requestedArgs;
         statusHandler.postDelayed(() -> {
             android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE dispatch tool=" + requestedTool
                     + " bridgeConnected=" + MyAiAccessibilityService.isConnected());
-            runTool(tool(requestedTool, "{}"));
+            // Keep the argument-bearing smoke hook isolated on this test branch.
+            if ("type_text".equals(requestedTool) && commandInput != null) {
+                commandInput.requestFocus();
+            }
+            runTool(tool(requestedTool, smokeArgs));
         }, 1500);
     }
 
