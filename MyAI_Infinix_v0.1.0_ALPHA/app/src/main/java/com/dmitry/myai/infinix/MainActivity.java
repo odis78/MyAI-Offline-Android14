@@ -170,6 +170,9 @@ public class MainActivity extends Activity {
                 String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
                 append(result);
                 addChat("MyAI", result);
+                if ("get_screen_state".equals(r.tool) && !r.dataJson.equals("{}")) {
+                    addChat("Экран", summarizeScreen(r.dataJson));
+                }
                 android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
             } catch (Exception e) {
                 android.util.Log.e("MyAI-Infinix", "TOOL_ERROR " + e.getClass().getName()
