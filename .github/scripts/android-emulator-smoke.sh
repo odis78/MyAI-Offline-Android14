@@ -427,43 +427,31 @@ wait_for_tool_result() {
   return 1
 }
 
-# A system ANR overlay can obscure the app while UiAutomator still returns the
-# underlying app hierarchy. Recover it before tapping any Accessibility-backed tool.
-recover_unresponsive_dialog || fail "Could not recover from emulator dialog before screen-state test"
-tap_resource "testScreen"
+# Dispatch smoke tools through explicit Activity intents instead of approximate
+# screen coordinates. This exercises the real ToolAgent/ToolExecutor path and
+# avoids false failures from layout, density, or system ANR overlays.
+run_test_tool() {
+  local tool="$1"
+  recover_unresponsive_dialog || fail "Could not recover from emulator dialog before $tool test"
+  echo "Dispatching smoke tool through Activity intent: $tool"
+  adb shell am start -n "$ACTIVITY" --es myai_test_tool "$tool" || fail "Could not dispatch smoke intent for $tool"
+  sleep 2
+}
+
+run_test_tool "get_screen_state"
 wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success (see explicit tool result/timeout above)"
 dump_ui || fail "UI dump failed after screen-state test"
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-screen.png"
-# UI labels or results can vary; require the app to remain foreground and capture the output.
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
-recover_unresponsive_dialog || fail "Could not recover from emulator dialog before scroll-up test"
-tap_resource "testScrollUp"
+run_test_tool "scroll_up"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
 
-# The Home tool legitimately backgrounds MainActivity. First dismiss any
-# emulator ANR overlay, then tap the control and poll for its result. If an ANR
-# overlay raced with the tap, recover it and retry the tap once.
-recover_unresponsive_dialog || fail "Could not recover from emulator dialog before tool protocol test"
-tap_resource "testTool"
-home_ok=0
-for attempt in $(seq 1 12); do
-  if adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -Fq 'TOOL_RESULT home: OK dispatched'; then
-    home_ok=1
-    break
-  fi
-  recover_unresponsive_dialog || fail "Could not recover from emulator dialog while waiting for tool result"
-  if [[ "$dialog_recovered" -eq 1 ]]; then
-    # If the dialog had intercepted the previous tap, bring the app back and retry.
-    adb shell am start -n "$ACTIVITY" >/dev/null 2>&1 || true
-    sleep 2
-    tap_resource "testTool"
-  fi
-  sleep 2
-done
-[[ "$home_ok" -eq 1 ]] || fail "Tool protocol home command did not report success after dialog recovery/retry"
-dump_ui || fail "UI dump failed after tool protocol test"
+# Home legitimately backgrounds MainActivity; the explicit result log remains testable.
+run_test_tool "home"
+wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool protocol home command did not report success"
+dump_ui || true
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
