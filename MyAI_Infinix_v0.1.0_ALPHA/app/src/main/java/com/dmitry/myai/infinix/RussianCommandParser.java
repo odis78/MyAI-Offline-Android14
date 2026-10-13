@@ -81,7 +81,7 @@ final class RussianCommandParser {
     }
 
     private static Command openApp(String packageName) {
-        return new Command("open_app", "{\\"package\\":\\"" + packageName + "\\"}");
+        return new Command("open_app", "{\"package\":\"" + packageName + "\"}");
     }
 
     private static boolean has(String text, String... phrases) {
