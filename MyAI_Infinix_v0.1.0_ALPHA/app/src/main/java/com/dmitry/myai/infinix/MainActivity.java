@@ -168,12 +168,21 @@ public class MainActivity extends Activity {
             try {
                 var r = agent.dispatchJson(json);
                 String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
+                // Publish the tool result before optional screen-text formatting.
+                // The smoke test must observe the completed bridge action even if
+                // rendering the captured screen text fails for any reason.
+                android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
                 append(result);
                 addChat("MyAI", result);
                 if ("get_screen_state".equals(r.tool) && !r.dataJson.equals("{}")) {
-                    addChat("Экран", summarizeScreen(r.dataJson));
+                    try {
+                        addChat("Экран", summarizeScreen(r.dataJson));
+                    } catch (RuntimeException displayError) {
+                        android.util.Log.w("MyAI-Infinix",
+                                "SCREEN_TEXT_DISPLAY_ERROR " + displayError.getClass().getSimpleName()
+                                        + ": " + displayError.getMessage());
+                    }
                 }
-                android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
             } catch (Exception e) {
                 android.util.Log.e("MyAI-Infinix", "TOOL_ERROR " + e.getClass().getName()
                         + ": " + e.getMessage(), e);
