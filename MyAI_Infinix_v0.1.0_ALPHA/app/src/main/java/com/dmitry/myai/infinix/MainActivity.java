@@ -52,6 +52,11 @@ public class MainActivity extends Activity {
         MyAiAccessibilityService.addConnectionListener(connectionListener);
         updateBridgeStatus();
         addChat("MyAI", "Чат команд готов. Примеры: «назад», «домой», «прокрути вниз», «прочитай экран», «открой YouTube». Для управления телефоном включи службу специальных возможностей.");
+        // Deterministic CI entry point: avoid fragile screen-coordinate taps for tool smoke tests.
+        String smokeTool = getIntent().getStringExtra("myai_test_tool");
+        if (smokeTool != null && !smokeTool.trim().isEmpty()) {
+            statusHandler.postDelayed(() -> runTool(tool(smokeTool.trim(), "{}")), 1500);
+        }
     }
 
     private void submitCommand() {
