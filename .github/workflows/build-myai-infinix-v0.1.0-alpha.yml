@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - infinix
+      - rebuild-run104-signed-apk
 
 permissions:
   contents: read
