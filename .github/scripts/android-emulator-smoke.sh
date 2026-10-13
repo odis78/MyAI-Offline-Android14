@@ -431,26 +431,52 @@ wait_for_tool_result() {
 # screen coordinates. This exercises the real ToolAgent/ToolExecutor path and
 # avoids false failures from layout, density, or system ANR overlays.
 run_test_tool() {
-  local tool="$1"
+  local tool="$1" args="${2:-}"
+  [[ -n "$args" ]] || args="{}"
   recover_unresponsive_dialog || fail "Could not recover from emulator dialog before $tool test"
-  echo "Dispatching smoke tool through Activity intent: $tool"
-  adb shell am start -n "$ACTIVITY" --es myai_test_tool "$tool" || fail "Could not dispatch smoke intent for $tool"
+  echo "Dispatching smoke tool through Activity intent: $tool args=$args"
+  adb shell am start -n "$ACTIVITY" --es myai_test_tool "$tool" --es myai_test_args "$args" || fail "Could not dispatch smoke intent for $tool"
   sleep 2
 }
 
+# Expanded validation is isolated from the stable run-104 branch/source.
 run_test_tool "get_screen_state"
-wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success (see explicit tool result/timeout above)"
-dump_ui || fail "UI dump failed after screen-state test"
+wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen captured" || fail "get_screen_state tool did not report success"
+dump_ui || fail "Screenshot capture failed after screen-state test"
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-screen.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
 grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
-run_test_tool "scroll_up"
-wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
+run_test_tool "find_node" '{"text":"MyAI"}'
+wait_for_tool_result "find_node" "TOOL_RESULT find_node: OK node found" || fail "find_node tool did not report success"
 
-# Home legitimately backgrounds MainActivity; the explicit result log remains testable.
+run_test_tool "wait_for" '{"text":"MyAI"}'
+wait_for_tool_result "wait_for" "TOOL_RESULT wait_for: OK condition met" || fail "wait_for tool did not report success"
+
+run_test_tool "type_text" '{"text":"run104-test"}'
+wait_for_tool_result "type_text" "TOOL_RESULT type_text: OK text entered" || fail "type_text tool did not report success"
+
+run_test_tool "click" '{"text":"ОТКРЫТЬ СПЕЦИАЛЬНЫЕ ВОЗМОЖНОСТИ"}'
+wait_for_tool_result "click" "TOOL_RESULT click: OK" || fail "click tool did not report success"
+
+run_test_tool "scroll_down"
+wait_for_tool_result "scroll_down" "TOOL_RESULT scroll_down: OK scroll dispatched" || fail "scroll_down tool did not report success"
+
+run_test_tool "scroll_up"
+wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success"
+
+run_test_tool "open_app" '{"package":"com.android.settings"}'
+wait_for_tool_result "open_app" "TOOL_RESULT open_app: OK launch dispatched" || fail "open_app Settings did not report success"
+
+# Back/Recents/Home intentionally change foreground state; verify dispatch in logcat.
+run_test_tool "back"
+wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "back tool did not report success"
+
+run_test_tool "recents"
+wait_for_tool_result "recents" "TOOL_RESULT recents: OK dispatched" || fail "recents tool did not report success"
+
 run_test_tool "home"
-wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool protocol home command did not report success"
+wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "home tool did not report success"
 dump_ui || true
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
