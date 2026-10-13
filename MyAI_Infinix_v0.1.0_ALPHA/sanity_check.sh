@@ -9,6 +9,7 @@ required=(
   settings.gradle build.gradle gradle.properties app/build.gradle
   app/src/main/AndroidManifest.xml
   app/src/main/java/com/dmitry/myai/infinix/MainActivity.java
+  app/src/main/java/com/dmitry/myai/infinix/RussianCommandParser.java
   app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java
   app/src/main/java/com/dmitry/myai/infinix/bridge/MyAiAccessibilityService.java
   app/src/main/java/com/dmitry/myai/infinix/memory/LocalMemoryStore.java
@@ -87,3 +88,10 @@ grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/safety/Poli
 grep -Fq 'new JSONObject(json)' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolProtocol.java"
 grep -Fq 'node.recycle()' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'dispatchJson' "$R/app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java"
+
+# The chat must route natural-language input through the deterministic offline parser.
+grep -Fq 'RussianCommandParser.parse(raw)' "$R/app/src/main/java/com/dmitry/myai/infinix/MainActivity.java"
+grep -Fq 'class RussianCommandParser' "$R/app/src/main/java/com/dmitry/myai/infinix/RussianCommandParser.java"
+grep -Fq 'get_screen_state' "$R/app/src/main/java/com/dmitry/myai/infinix/RussianCommandParser.java"
+grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/RussianCommandParser.java"
+grep -Fq 'scroll_up' "$R/app/src/main/java/com/dmitry/myai/infinix/RussianCommandParser.java"

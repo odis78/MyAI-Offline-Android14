@@ -7,74 +7,187 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 import android.widget.*;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.json.JSONObject;
 import com.dmitry.myai.infinix.agent.AgentContracts;
 import com.dmitry.myai.infinix.bridge.MyAiAccessibilityService;
 
 public class MainActivity extends Activity {
-    TextView status,log;
+    TextView status, log, chat;
+    EditText commandInput;
     AgentContracts.ToolAgent agent;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
-    // Accessibility tree traversal and tool waits must not block Android's UI thread.
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
     private boolean destroyed = false;
     private final MyAiAccessibilityService.ConnectionListener connectionListener =
             connected -> statusHandler.post(this::updateBridgeStatus);
 
-    @Override public void onCreate(Bundle b){
-        super.onCreate(b); setContentView(R.layout.activity_main);
-        status=findViewById(R.id.status); log=findViewById(R.id.log); agent=new AgentContracts.ToolAgent(this);
-        findViewById(R.id.accessibility).setOnClickListener(v->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        findViewById(R.id.testHome).setOnClickListener(v->run(()->MyAiAccessibilityService.home()));
-        findViewById(R.id.testBack).setOnClickListener(v->run(()->MyAiAccessibilityService.back()));
-        findViewById(R.id.testScroll).setOnClickListener(v->run(()->MyAiAccessibilityService.scrollDown()));
-        findViewById(R.id.testScrollUp).setOnClickListener(v->runTool("{\"tool\":\"scroll_up\",\"args\":{}}"));
-        findViewById(R.id.testScreen).setOnClickListener(v->runTool("{\"tool\":\"get_screen_state\",\"args\":{}}"));
-        findViewById(R.id.testTool).setOnClickListener(v->runTool("{\"tool\":\"home\",\"args\":{}}"));
+    @Override public void onCreate(Bundle b) {
+        super.onCreate(b);
+        setContentView(R.layout.activity_main);
+        status = findViewById(R.id.status);
+        log = findViewById(R.id.log);
+        chat = findViewById(R.id.chat);
+        commandInput = findViewById(R.id.commandInput);
+        agent = new AgentContracts.ToolAgent(this);
+
+        findViewById(R.id.accessibility).setOnClickListener(v ->
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        findViewById(R.id.sendCommand).setOnClickListener(v -> submitCommand());
+        commandInput.setOnEditorActionListener((v, actionId, event) -> {
+            submitCommand();
+            return true;
+        });
+        findViewById(R.id.testHome).setOnClickListener(v -> runTool("{\"tool\":\"home\",\"args\":{}}"));
+        findViewById(R.id.testBack).setOnClickListener(v -> runTool("{\"tool\":\"back\",\"args\":{}}"));
+        findViewById(R.id.testScroll).setOnClickListener(v -> runTool("{\"tool\":\"scroll_down\",\"args\":{}}"));
+        findViewById(R.id.testScrollUp).setOnClickListener(v -> runTool("{\"tool\":\"scroll_up\",\"args\":{}}"));
+        findViewById(R.id.testScreen).setOnClickListener(v -> runTool("{\"tool\":\"get_screen_state\",\"args\":{}}"));
+        findViewById(R.id.testTool).setOnClickListener(v -> runTool("{\"tool\":\"home\",\"args\":{}}"));
         MyAiAccessibilityService.addConnectionListener(connectionListener);
         updateBridgeStatus();
+        addChat("MyAI", "Чат команд готов. Примеры: «назад», «домой», «прокрути вниз», «прочитай экран», «открой YouTube». Для управления телефоном включи службу специальных возможностей.");
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onCreate hasExtra=" + getIntent().hasExtra("myai_test_tool"));
+        scheduleSmokeTool(getIntent());
     }
-    void run(Runnable r){
-        commandExecutor.execute(() -> {
-            try { r.run(); append("TEST dispatched"); }
-            catch(Exception e){ append("ERROR: "+e.getMessage()); }
-        });
+
+    private void scheduleSmokeTool(Intent intent) {
+        if (intent == null) {
+            android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE schedule skipped: null intent");
+            return;
+        }
+        String smokeTool = intent.getStringExtra("myai_test_tool");
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE schedule received tool=" + smokeTool
+                + " action=" + intent.getAction());
+        if (smokeTool == null || smokeTool.trim().isEmpty()) return;
+        String requestedTool = smokeTool.trim();
+        statusHandler.postDelayed(() -> {
+            android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE dispatch tool=" + requestedTool
+                    + " bridgeConnected=" + MyAiAccessibilityService.isConnected());
+            runTool(tool(requestedTool, "{}"));
+        }, 1500);
     }
-    void runTool(String json){
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onNewIntent hasExtra="
+                + (intent != null && intent.hasExtra("myai_test_tool")));
+        scheduleSmokeTool(intent);
+    }
+
+    private void submitCommand() {
+        String raw = commandInput.getText().toString().trim();
+        if (raw.isEmpty()) return;
+        commandInput.setText("");
+        ((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE))
+                .hideSoftInputFromWindow(commandInput.getWindowToken(), 0);
+        addChat("Вы", raw);
+        RussianCommandParser.Command parsed = RussianCommandParser.parse(raw);
+        if (parsed == null) {
+            addChat("MyAI", "Пока не распознал намерение. Попробуй сказать свободнее: «можешь вернуться назад», «перейди на главный экран», «пролистай немного ниже», «посмотри, что на экране», «запусти YouTube», «открой браузер» или «покажи настройки». Это офлайн-маршрутизатор фраз, не подключённая языковая модель.");
+            return;
+        }
+        String json = tool(parsed.tool, parsed.argsJson);
+        final String request = json;
         commandExecutor.execute(() -> {
             try {
-                var r=agent.dispatchJson(json);
-                String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
-                append(result);
-                android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
-                if(!r.dataJson.equals("{}")) append(r.dataJson);
-            } catch(Exception e) {
-                String message = "TOOL ERROR: " + (e.getMessage()==null ? e.getClass().getSimpleName() : e.getMessage());
+                var result = agent.dispatchJson(request);
+                String message = result.tool + ": " + (result.success ? "OK — " : "Ошибка — ") + result.message;
+                addChat("MyAI", message);
                 append(message);
-                android.util.Log.e("MyAI-Infinix", message, e);
+                android.util.Log.i("MyAI-Infinix", "CHAT_COMMAND " + message);
+                if ("get_screen_state".equals(result.tool) && !result.dataJson.equals("{}")) {
+                    addChat("Экран", summarizeScreen(result.dataJson));
+                }
+            } catch (Exception e) {
+                String message = "Ошибка команды: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                addChat("MyAI", message);
+                append(message);
             }
         });
     }
-    private void updateBridgeStatus(){
+
+    private static String tool(String name, String args) {
+        try { return new JSONObject().put("tool", name).put("args", new JSONObject(args)).toString(); }
+        catch (Exception e) { return "{\"tool\":\"" + name + "\",\"args\":{}}"; }
+    }
+    private static boolean containsAny(String value, String... terms) {
+        for (String term : terms) if (value.contains(term)) return true;
+        return false;
+    }
+    private String summarizeScreen(String data) {
+        try {
+            org.json.JSONArray elements = new JSONObject(data).optJSONArray("elements");
+            if (elements == null || elements.length() == 0) return "Экран прочитан, текстовых элементов не найдено.";
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < elements.length() && i < 12; i++) {
+                JSONObject item = elements.optJSONObject(i);
+                if (item == null) continue;
+                String text = item.optString("text", "");
+                String desc = item.optString("description", "");
+                String label = !text.isEmpty() ? text : desc;
+                if (!label.isEmpty()) {
+                    if (out.length() > 0) out.append(" · ");
+                    out.append(label);
+                }
+            }
+            return out.length() == 0 ? "Экран прочитан; видимые элементы без текста." : out.toString();
+        } catch (Exception e) { return "Экран получен, но результат не удалось разобрать."; }
+    }
+    private void addChat(String who, String text) {
+        runOnUiThread(() -> { if (chat != null && !destroyed) chat.append(who + ": " + text + "\n\n"); });
+    }
+    void runTool(String json) {
+        android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE runTool queued");
+        commandExecutor.execute(() -> {
+            try {
+                var r = agent.dispatchJson(json);
+                String result = r.tool + ": " + (r.success ? "OK " : "FAIL ") + r.message;
+                // Publish the tool result before optional screen-text formatting.
+                // The smoke test must observe the completed bridge action even if
+                // rendering the captured screen text fails for any reason.
+                android.util.Log.i("MyAI-Infinix", "TOOL_RESULT " + result);
+                append(result);
+                addChat("MyAI", result);
+                if ("get_screen_state".equals(r.tool) && !r.dataJson.equals("{}")) {
+                    try {
+                        addChat("Экран", summarizeScreen(r.dataJson));
+                    } catch (RuntimeException displayError) {
+                        android.util.Log.w("MyAI-Infinix",
+                                "SCREEN_TEXT_DISPLAY_ERROR " + displayError.getClass().getSimpleName()
+                                        + ": " + displayError.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.e("MyAI-Infinix", "TOOL_ERROR " + e.getClass().getName()
+                        + ": " + e.getMessage(), e);
+                append("TOOL ERROR: " + e.getMessage());
+            }
+        });
+    }
+    void append(String s) {
+        runOnUiThread(() -> {
+            if (log == null || destroyed) return;
+            log.append(s + "\n");
+            log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN));
+        });
+    }
+    private void updateBridgeStatus() {
         if (destroyed || status == null) return;
         String text = MyAiAccessibilityService.isConnected()
-                ? "Control Bridge: ПОДКЛЮЧЕН"
-                : "Control Bridge: НЕ ПОДКЛЮЧЕН";
+                ? "Control Bridge: ПОДКЛЮЧЕН" : "Control Bridge: НЕ ПОДКЛЮЧЕН";
         status.setText(text);
         status.setContentDescription(text);
     }
-    void append(String s){runOnUiThread(() -> { if(log==null)return; log.append(s+"\n"); log.post(() -> ((ScrollView)findViewById(R.id.logScroll)).fullScroll(View.FOCUS_DOWN)); });}
-    @Override protected void onResume(){
-        super.onResume();
-        updateBridgeStatus();
-    }
-    @Override protected void onPause(){
-        updateBridgeStatus();
-        super.onPause();
-    }
-    @Override protected void onDestroy(){
+    @Override protected void onResume() { super.onResume(); updateBridgeStatus(); }
+    @Override protected void onPause() { updateBridgeStatus(); super.onPause(); }
+    @Override protected void onDestroy() {
         destroyed = true;
         MyAiAccessibilityService.removeConnectionListener(connectionListener);
         commandExecutor.shutdownNow();

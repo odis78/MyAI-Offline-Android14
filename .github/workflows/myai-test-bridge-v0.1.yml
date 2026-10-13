@@ -1,6 +1,14 @@
 name: MyAI Test Bridge v0.1
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - myai-test-bridge-v0.1
+    paths:
+      - 'test-bridge/**'
+      - '.github/workflows/myai-test-bridge-v0.1.yml'
+      - '.github/scripts/**'
+      - 'MyAI_Infinix_v0.1.0_ALPHA/**'
   push:
     branches:
       - myai-test-bridge-v0.1
