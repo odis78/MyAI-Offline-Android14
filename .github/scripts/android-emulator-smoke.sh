@@ -69,7 +69,12 @@ capture_failure_evidence() {
   adb devices -l > "$EVIDENCE/adb-devices-${tag}.txt" 2>&1 || true
   adb version > "$EVIDENCE/adb-version-${tag}.txt" 2>&1 || true
   # Preserve attribution before recovery or restarts can overwrite the evidence.
+  # Keep both a bounded multi-buffer log and the full available logcat ring buffer.
   adb logcat -d -b main -b system -b events -b crash -v threadtime -t 12000 > "$EVIDENCE/logcat-${tag}.txt" 2>&1 || true
+  adb logcat -d -v threadtime > "$EVIDENCE/full-logcat-${tag}.txt" 2>&1 || true
+  adb shell dumpsys accessibility > "$EVIDENCE/accessibility-${tag}.txt" 2>&1 || true
+  adb shell top -H -n 1 > "$EVIDENCE/top-threads-${tag}.txt" 2>&1 || true
+  adb shell dumpsys cpuinfo > "$EVIDENCE/cpuinfo-${tag}.txt" 2>&1 || true
   adb shell dumpsys activity lastanr > "$EVIDENCE/lastanr-${tag}.txt" 2>&1 || true
   adb shell dumpsys activity processes > "$EVIDENCE/processes-${tag}.txt" 2>&1 || true
   adb shell dumpsys activity activities > "$EVIDENCE/activities-${tag}.txt" 2>&1 || true
@@ -417,6 +422,8 @@ wait_for_tool_result() {
   done
   echo "Timed out waiting for tool result: $tool" >&2
   adb logcat -d -s MyAI-Infinix:I 2>/dev/null | grep -F "TOOL_RESULT" | tail -n 30 || true
+  # Snapshot diagnostics immediately at timeout, before fail/recovery changes device state.
+  capture_failure_evidence "timeout-$tool"
   return 1
 }
 
