@@ -67,6 +67,11 @@ public final class ToolExecutor {
             return verification.accepted(result)
                 ? result : ToolResult.fail(call.tool, "verification failed");
         } catch (Exception e) {
+            android.util.Log.e("MyAI-Infinix",
+                "GET_SCREEN_STATE_TRACE E execute-exception tool=" + call.tool
+                    + " thread=" + Thread.currentThread().getName()
+                    + " type=" + e.getClass().getName()
+                    + " message=" + e.getMessage(), e);
             return ToolResult.fail(call.tool,
                 e.getMessage() == null ? "execution error" : e.getMessage());
         }
