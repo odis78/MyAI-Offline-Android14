@@ -88,31 +88,12 @@ public class MainActivity extends Activity {
         ((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE))
                 .hideSoftInputFromWindow(commandInput.getWindowToken(), 0);
         addChat("Вы", raw);
-        String lower = raw.toLowerCase(Locale.ROOT);
-        String json = null;
-        if (containsAny(lower, "домой", "на главный экран", "главный экран")) {
-            json = tool("home", "{}");
-        } else if (containsAny(lower, "назад", "вернись", "вернуться")) {
-            json = tool("back", "{}");
-        } else if (containsAny(lower, "прокрути вниз", "прокрутка вниз", "листай вниз", "скроль вниз", "вниз")) {
-            json = tool("scroll_down", "{}");
-        } else if (containsAny(lower, "прокрути вверх", "прокрутка вверх", "листай вверх", "скроль вверх", "вверх")) {
-            json = tool("scroll_up", "{}");
-        } else if (containsAny(lower, "прочитай экран", "прочти экран", "что на экране", "состояние экрана")) {
-            json = tool("get_screen_state", "{}");
-        } else if (lower.contains("открой youtube") || lower.contains("запусти youtube") || lower.contains("открой ютуб")) {
-            json = tool("open_app", "{\"package\":\"com.google.android.youtube\"}");
-        } else if (lower.contains("открой chrome") || lower.contains("запусти chrome") || lower.contains("открой браузер")) {
-            json = tool("open_app", "{\"package\":\"com.android.chrome\"}");
-        } else if (lower.contains("открой настройки") || lower.contains("открой settings")) {
-            json = tool("open_app", "{\"package\":\"com.android.settings\"}");
-        } else if (lower.contains("открой галерею")) {
-            addChat("MyAI", "Пока не могу надёжно определить пакет галереи на этом телефоне. Следующим шагом добавим выбор приложений по установленному списку.");
-            return;
-        } else {
-            addChat("MyAI", "Пока не распознал команду. Сейчас поддерживаются: «домой», «назад», «прокрути вниз/вверх», «прочитай экран», «открой YouTube», «открой Chrome», «открой настройки». Это базовый командный маршрутизатор, не подключённая языковая модель.");
+        RussianCommandParser.Command parsed = RussianCommandParser.parse(raw);
+        if (parsed == null) {
+            addChat("MyAI", "Пока не распознал намерение. Попробуй сказать свободнее: «можешь вернуться назад», «перейди на главный экран», «пролистай немного ниже», «посмотри, что на экране», «запусти YouTube», «открой браузер» или «покажи настройки». Это офлайн-маршрутизатор фраз, не подключённая языковая модель.");
             return;
         }
+        String json = tool(parsed.tool, parsed.argsJson);
         final String request = json;
         commandExecutor.execute(() -> {
             try {
