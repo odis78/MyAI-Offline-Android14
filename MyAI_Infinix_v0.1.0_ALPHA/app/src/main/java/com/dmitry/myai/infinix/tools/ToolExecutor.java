@@ -27,6 +27,8 @@ public final class ToolExecutor {
     }
 
     public ToolResult execute(ToolCall call) {
+        android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE A execute-enter tool="
+            + (call == null ? "null" : call.tool) + " thread=" + Thread.currentThread().getName());
         if (call == null) return ToolResult.fail("", "null tool call");
         if (!policy.allowed(call)) return ToolResult.fail(call.tool, "blocked by policy");
         try {
@@ -60,6 +62,8 @@ public final class ToolExecutor {
                     break;
                 default: result = ToolResult.fail(call.tool, "unknown tool");
             }
+            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE D execute-result tool="
+                + call.tool + " success=" + result.success + " message=" + result.message);
             return verification.accepted(result)
                 ? result : ToolResult.fail(call.tool, "verification failed");
         } catch (Exception e) {
