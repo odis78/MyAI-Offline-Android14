@@ -17,6 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 public final class ToolExecutor {
+    private static final int SCREEN_MAX_DEPTH = 15;
+    private static final int SCREEN_MAX_VISITED_NODES = 300;
+    private static final int SCREEN_MAX_OUTPUT_NODES = 80;
+    private static final long SCREEN_MAX_TRAVERSAL_MS = 1000L;
+
     private final Context context;
     private final PolicyGate policy;
     private final VerificationEngine verification = new VerificationEngine();
@@ -88,10 +93,24 @@ public final class ToolExecutor {
         try {
             List<String> nodes = new ArrayList<>();
             int[] visitedNodes = new int[] {0};
-            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-begin");
-            collect(root, nodes, 0, visitedNodes);
+            int[] limitFlags = new int[] {0};
+            long traversalStart = android.os.SystemClock.elapsedRealtime();
+            long traversalDeadline = traversalStart + SCREEN_MAX_TRAVERSAL_MS;
+            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-begin"
+                + " maxDepth=" + SCREEN_MAX_DEPTH
+                + " maxVisitedNodes=" + SCREEN_MAX_VISITED_NODES
+                + " maxTraversalMs=" + SCREEN_MAX_TRAVERSAL_MS);
+            collect(root, nodes, 0, visitedNodes, traversalDeadline, limitFlags);
+            if (limitFlags[0] != 0) {
+                android.util.Log.w("MyAI-Infinix", "SCREEN_TRAVERSAL_LIMIT_REACHED reason="
+                    + limitReason(limitFlags[0]) + " outputNodeCount=" + nodes.size()
+                    + " visitedNodeCount=" + visitedNodes[0]
+                    + " traversalElapsedMs="
+                    + (android.os.SystemClock.elapsedRealtime() - traversalStart));
+            }
             android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-end outputNodeCount="
                 + nodes.size() + " visitedNodeCount=" + visitedNodes[0]
+                + " traversalElapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traversalStart)
                 + " elapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traceStart));
             StringBuilder json = new StringBuilder("{\"elements\":[");
             for (int i = 0; i < nodes.size(); i++) {
@@ -106,8 +125,22 @@ public final class ToolExecutor {
     }
 
     private void collect(AccessibilityNodeInfo node, List<String> out, int depth,
-                         int[] visitedNodes) {
-        if (node == null || depth > 8 || out.size() >= 80) return;
+                         int[] visitedNodes, long deadlineMs, int[] limitFlags) {
+        if (node == null) return;
+        if (depth > SCREEN_MAX_DEPTH) {
+            if (limitFlags[0] == 0) limitFlags[0] = 1;
+            return;
+        }
+        if (visitedNodes[0] >= SCREEN_MAX_VISITED_NODES) {
+            if (limitFlags[0] == 0) limitFlags[0] = 2;
+            return;
+        }
+        if (android.os.SystemClock.elapsedRealtime() >= deadlineMs) {
+            if (limitFlags[0] == 0) limitFlags[0] = 3;
+            return;
+        }
+        if (out.size() >= SCREEN_MAX_OUTPUT_NODES) return;
+
         visitedNodes[0]++;
         final long nodeStart = android.os.SystemClock.elapsedRealtime();
         long t = android.os.SystemClock.elapsedRealtime();
@@ -138,6 +171,10 @@ public final class ToolExecutor {
             }
         }
 
+        if (android.os.SystemClock.elapsedRealtime() >= deadlineMs) {
+            if (limitFlags[0] == 0) limitFlags[0] = 3;
+            return;
+        }
         t = android.os.SystemClock.elapsedRealtime();
         int childCount = node.getChildCount();
         long childCountMs = android.os.SystemClock.elapsedRealtime() - t;
@@ -145,7 +182,15 @@ public final class ToolExecutor {
             android.util.Log.w("MyAI-Infinix", "SCREEN_CHILD_COUNT_SLOW depth=" + depth
                 + " elapsedMs=" + childCountMs + " childCount=" + childCount);
         }
-        for (int i = 0; i < childCount && out.size() < 80; i++) {
+        for (int i = 0; i < childCount && out.size() < SCREEN_MAX_OUTPUT_NODES; i++) {
+            if (visitedNodes[0] >= SCREEN_MAX_VISITED_NODES) {
+                if (limitFlags[0] == 0) limitFlags[0] = 2;
+                break;
+            }
+            if (android.os.SystemClock.elapsedRealtime() >= deadlineMs) {
+                if (limitFlags[0] == 0) limitFlags[0] = 3;
+                break;
+            }
             t = android.os.SystemClock.elapsedRealtime();
             AccessibilityNodeInfo child = node.getChild(i);
             long getChildMs = android.os.SystemClock.elapsedRealtime() - t;
@@ -155,7 +200,7 @@ public final class ToolExecutor {
             }
             if (child == null) continue;
             try {
-                collect(child, out, depth + 1, visitedNodes);
+                collect(child, out, depth + 1, visitedNodes, deadlineMs, limitFlags);
             } finally {
                 child.recycle();
             }
@@ -164,6 +209,15 @@ public final class ToolExecutor {
         if (nodeMs >= 100) {
             android.util.Log.w("MyAI-Infinix", "SCREEN_NODE_TOTAL_SLOW depth=" + depth
                 + " elapsedMs=" + nodeMs + " children=" + childCount);
+        }
+    }
+
+    private String limitReason(int flag) {
+        switch (flag) {
+            case 1: return "max_depth";
+            case 2: return "max_visited_nodes";
+            case 3: return "time_budget";
+            default: return "unknown";
         }
     }
 
