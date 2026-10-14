@@ -471,9 +471,9 @@ if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-setting
   fail "Settings did not become foreground before Back test; destination assertion would be invalid"
 fi
 
-# 0x18000000 = FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_MULTIPLE_TASK.
-# This avoids reusing the prior MyAI task whose history was changed by the Home test.
-adb shell am start -n "$ACTIVITY" -f 0x18000000 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
+# Launch normally over Settings. MULTIPLE_TASK would isolate MyAI from Settings
+# and invalidate the expected Back destination.
+adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
 sleep 3
 adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
 if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
@@ -504,16 +504,9 @@ adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EV
 grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:' \
   "$EVIDENCE/logcat.txt" > "$EVIDENCE/anr-summary-final.txt" 2>/dev/null || true
 
-if grep -Eiq 'ANR in com[.]dmitry[.]myai[.]infinix|am_anr.*com[.]dmitry[.]myai[.]infinix' "$EVIDENCE/logcat.txt"; then
+if grep -Eiq 'ANR in |am_anr|Input dispatching timed out|Application Not Responding:|AppNotRespondingDialog' "$EVIDENCE/logcat.txt"; then
   capture_anr_traces post-test
-  fail "ANR attributed to MyAI was found in final logcat"
-fi
-if grep -Eiq 'ANR in |am_anr|Input dispatching timed out|Application Not Responding:' "$EVIDENCE/logcat.txt"; then
-  echo "WARNING: Android ANR evidence exists in this emulator run; collecting end-of-run traces."
-  capture_anr_traces post-test
-  emulator_health_warning=1
-else
-  emulator_health_warning=0
+  fail "ANR/AppNotRespondingDialog evidence found in final logcat; smoke run is not PASS even if functional actions completed"
 fi
 
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
@@ -523,8 +516,4 @@ fi
 adb exec-out screencap -p > "$EVIDENCE/android-emulator.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-final.txt"
 cp "$APK" "$EVIDENCE/app-debug.apk"
-if [[ "$emulator_health_warning" -eq 1 ]]; then
-  echo "PASS WITH ENVIRONMENT WARNING: functional smoke checks passed, but Android ANR evidence was also recorded; inspect anr-summary-final.txt and post-test ANR traces."
-else
-  echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, tool-protocol action, and crash scan all passed; no ANR signature found in captured final logcat."
-fi
+echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, Back destination assertion, and crash scan all passed; no ANR signature found in captured final logcat."
