@@ -1,0 +1,81 @@
+name: Run 11 - Isolate Accessibility Bridge loss
+
+on:
+  push:
+    branches:
+      - diagnostic/bridge-isolation-run11
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-isolate:
+    name: Build diagnostic APK, no-tool control, then tool smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout isolated diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Run source sanity checks
+        shell: bash
+        run: bash MyAI_Infinix_v0.1.0_ALPHA/sanity_check.sh
+
+      - name: Build diagnostic debug APK
+        working-directory: MyAI_Infinix_v0.1.0_ALPHA
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Run no-tool control and full smoke on isolated emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: |
+            set +e
+            echo "===== RUN 11A: CONTROL TRANSITION WITHOUT ANY MYAI TOOL CALLS ====="
+            bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-control-baseline.sh"
+            CONTROL_RC=$?
+            echo "RUN11_CONTROL_SCRIPT_EXIT=$CONTROL_RC"
+            echo "===== RUN 11B: EXISTING TOOL SMOKE, INCLUDING BACK DESTINATION ASSERTION ====="
+            bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
+            SMOKE_RC=$?
+            echo "RUN11_TOOL_SMOKE_EXIT=$SMOKE_RC"
+            exit "$SMOKE_RC"
+
+      - name: Upload run 11 APK and all evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-bridge-isolation-run-11
+          path: |
+            MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+            test-bridge/android-evidence/
+          if-no-files-found: warn
+          retention-days: 30
