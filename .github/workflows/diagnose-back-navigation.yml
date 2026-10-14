@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - fix/back-navigation-diagnostics-run104
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
