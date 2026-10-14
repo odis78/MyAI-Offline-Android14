@@ -45,7 +45,7 @@ snapshot() {
   else
     echo "enabled_setting=NO" > "$EVIDENCE/$tag-bridge-verdict.txt"
   fi
-  if awk '/Bound services:/ { in_bound=1; next } /Crashed services:/ { in_bound=0 } in_bound && /label=MyAI/ { found=1 } END { exit !found }' "$EVIDENCE/$tag-dumpsys-accessibility.txt"; then
+  if awk '/Bound services:/ && /label=MyAI/ { found=1 } /Bound services:/ { in_bound=1; if (/label=MyAI/) found=1; next } /Crashed services:/ { in_bound=0 } in_bound && /label=MyAI/ { found=1 } END { exit !found }' "$EVIDENCE/$tag-dumpsys-accessibility.txt"; then
     echo "bound_service=YES" >> "$EVIDENCE/$tag-bridge-verdict.txt"
   else
     echo "bound_service=NO_OR_UNPARSED" >> "$EVIDENCE/$tag-bridge-verdict.txt"
