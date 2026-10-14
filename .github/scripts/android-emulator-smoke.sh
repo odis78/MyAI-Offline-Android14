@@ -454,12 +454,33 @@ wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool prot
 dump_ui || true
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
+# Capture the full relevant buffers at the end. A functional smoke PASS must not
+# hide an Android system ANR that occurred during this same emulator session.
+adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EVIDENCE/logcat.txt"
+grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:' \
+  "$EVIDENCE/logcat.txt" > "$EVIDENCE/anr-summary-final.txt" 2>/dev/null || true
+
+if grep -Eiq 'ANR in com[.]dmitry[.]myai[.]infinix|am_anr.*com[.]dmitry[.]myai[.]infinix' "$EVIDENCE/logcat.txt"; then
+  capture_anr_traces post-test
+  fail "ANR attributed to MyAI was found in final logcat"
+fi
+if grep -Eiq 'ANR in |am_anr|Input dispatching timed out|Application Not Responding:' "$EVIDENCE/logcat.txt"; then
+  echo "WARNING: Android ANR evidence exists in this emulator run; collecting end-of-run traces."
+  capture_anr_traces post-test
+  emulator_health_warning=1
+else
+  emulator_health_warning=0
+fi
+
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
-adb logcat -d -t 8000 > "$EVIDENCE/logcat.txt"
 if grep -E 'FATAL EXCEPTION|Process: com\.dmitry\.myai\.infinix, PID:' "$EVIDENCE/logcat.txt" | grep -q .; then
   fail "Fatal application exception found in logcat"
 fi
 adb exec-out screencap -p > "$EVIDENCE/android-emulator.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-final.txt"
 cp "$APK" "$EVIDENCE/app-debug.apk"
-echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, tool-protocol action, and crash scan all passed."
+if [[ "$emulator_health_warning" -eq 1 ]]; then
+  echo "PASS WITH ENVIRONMENT WARNING: functional smoke checks passed, but Android ANR evidence was also recorded; inspect anr-summary-final.txt and post-test ANR traces."
+else
+  echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, tool-protocol action, and crash scan all passed; no ANR signature found in captured final logcat."
+fi
