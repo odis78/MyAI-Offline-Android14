@@ -10,10 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  build-and-isolate:
-    name: Build diagnostic APK, no-tool control, then tool smoke
+  build:
+    name: Static checks and diagnostic APK build
     runs-on: ubuntu-22.04
-    timeout-minutes: 50
+    timeout-minutes: 20
     steps:
       - name: Checkout isolated diagnostic branch
         uses: actions/checkout@v4
@@ -48,7 +48,39 @@ jobs:
         working-directory: MyAI_Infinix_v0.1.0_ALPHA
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Run no-tool control and full smoke on isolated emulator
+      - name: Upload diagnostic APK for isolated emulator jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-run11-debug-apk
+          path: MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  control-baseline:
+    name: Control A - Settings to MyAI without tool calls
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout diagnostic scripts
+        uses: actions/checkout@v4
+
+      - name: Download diagnostic APK
+        uses: actions/download-artifact@v4
+        with:
+          name: myai-run11-debug-apk
+          path: run11-apk
+
+      - name: Place APK at expected path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
+          APK="$(find run11-apk -type f -name app-debug.apk -print -quit)"
+          test -n "$APK"
+          cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Run no-tool control on clean emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -57,25 +89,57 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: |
-            set +e
-            echo "===== RUN 11A: CONTROL TRANSITION WITHOUT ANY MYAI TOOL CALLS ====="
-            bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-control-baseline.sh"
-            CONTROL_RC=$?
-            echo "RUN11_CONTROL_SCRIPT_EXIT=$CONTROL_RC"
-            echo "===== RUN 11B: EXISTING TOOL SMOKE, INCLUDING BACK DESTINATION ASSERTION ====="
-            bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
-            SMOKE_RC=$?
-            echo "RUN11_TOOL_SMOKE_EXIT=$SMOKE_RC"
-            exit "$SMOKE_RC"
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-control-baseline.sh"
 
-      - name: Upload run 11 APK and all evidence
+      - name: Upload control-only evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: myai-bridge-isolation-run-11
-          path: |
-            MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
-            test-bridge/android-evidence/
+          name: myai-bridge-isolation-run-11-control
+          path: test-bridge/android-evidence/run11-control/
+          if-no-files-found: warn
+          retention-days: 30
+
+  tool-smoke:
+    name: Control B - Existing tool smoke on a separate clean emulator
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout diagnostic scripts
+        uses: actions/checkout@v4
+
+      - name: Download diagnostic APK
+        uses: actions/download-artifact@v4
+        with:
+          name: myai-run11-debug-apk
+          path: run11-apk
+
+      - name: Place APK at expected path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
+          APK="$(find run11-apk -type f -name app-debug.apk -print -quit)"
+          test -n "$APK"
+          cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Run existing tool smoke on separate clean emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
+
+      - name: Upload tool-smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-bridge-isolation-run-11-tool-smoke
+          path: test-bridge/android-evidence/
           if-no-files-found: warn
           retention-days: 30
