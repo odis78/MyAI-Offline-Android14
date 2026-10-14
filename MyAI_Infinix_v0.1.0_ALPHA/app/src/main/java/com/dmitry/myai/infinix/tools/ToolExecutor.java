@@ -87,10 +87,12 @@ public final class ToolExecutor {
         if (root == null) return ToolResult.fail("get_screen_state", "no active accessibility root");
         try {
             List<String> nodes = new ArrayList<>();
+            int[] visitedNodes = new int[] {0};
             android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-begin");
-            collect(root, nodes, 0);
-            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-end nodeCount="
-                + nodes.size() + " elapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traceStart));
+            collect(root, nodes, 0, visitedNodes);
+            android.util.Log.i("MyAI-Infinix", "GET_SCREEN_STATE_TRACE C traversal-end outputNodeCount="
+                + nodes.size() + " visitedNodeCount=" + visitedNodes[0]
+                + " elapsedMs=" + (android.os.SystemClock.elapsedRealtime() - traceStart));
             StringBuilder json = new StringBuilder("{\"elements\":[");
             for (int i = 0; i < nodes.size(); i++) {
                 if (i > 0) json.append(',');
@@ -103,8 +105,10 @@ public final class ToolExecutor {
         }
     }
 
-    private void collect(AccessibilityNodeInfo node, List<String> out, int depth) {
+    private void collect(AccessibilityNodeInfo node, List<String> out, int depth,
+                         int[] visitedNodes) {
         if (node == null || depth > 8 || out.size() >= 80) return;
+        visitedNodes[0]++;
         final long nodeStart = android.os.SystemClock.elapsedRealtime();
         long t = android.os.SystemClock.elapsedRealtime();
         CharSequence text = node.getText();
@@ -151,7 +155,7 @@ public final class ToolExecutor {
             }
             if (child == null) continue;
             try {
-                collect(child, out, depth + 1);
+                collect(child, out, depth + 1, visitedNodes);
             } finally {
                 child.recycle();
             }
