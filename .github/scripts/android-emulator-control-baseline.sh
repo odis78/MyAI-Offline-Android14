@@ -85,9 +85,9 @@ wait_for_bound() {
 }
 
 echo "RUN 11 CONTROL: Settings -> MyAI transition with NO MyAI tool intents."
-[[ -s "$APK" ]] || { echo "CONTROL_SETUP_FAIL: APK missing: $APK"; exit 0; }
+[[ -s "$APK" ]] || { echo "CONTROL_SETUP_FAIL: APK missing: $APK"; exit 2; }
 adb_bounded start-server || true
-adb_bounded wait-for-device || { echo "CONTROL_SETUP_FAIL: adb device unavailable"; exit 0; }
+adb_bounded wait-for-device || { echo "CONTROL_SETUP_FAIL: adb device unavailable"; exit 2; }
 booted=0
 for n in $(seq 1 90); do
   [[ "$(adb_bounded shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == "1" ]] && { booted=1; break; }
@@ -97,14 +97,14 @@ if [[ "$booted" -ne 1 ]]; then
   echo "CONTROL_SETUP_FAIL: emulator did not finish booting" | tee "$EVIDENCE/control-setup-result.txt"
   snapshot "boot-timeout"
   capture_dropbox "boot-timeout"
-  exit 0
+  exit 2
 fi
 
 adb_bounded install -r "$APK" > "$EVIDENCE/install.txt" 2>&1 || {
   echo "CONTROL_SETUP_FAIL: install failed" | tee "$EVIDENCE/control-setup-result.txt"
   snapshot "install-failure"
   capture_dropbox "install-failure"
-  exit 0
+  exit 2
 }
 adb_bounded logcat -c >/dev/null 2>&1 || true
 adb_bounded shell am start -n "$ACTIVITY" > "$EVIDENCE/initial-app-launch.txt" 2>&1 || true
