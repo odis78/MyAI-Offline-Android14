@@ -454,6 +454,43 @@ wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool prot
 dump_ui || true
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
+# Verify Back by destination, not merely by performGlobalAction() returning true.
+# Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
+# assert that Android actually returns to Settings rather than the launcher/home.
+echo "Preparing Settings as the previous foreground app for Back navigation test"
+adb shell am start -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-before-back-start.txt"
+sleep 4
+recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
+adb shell dumpsys activity activities > "$EVIDENCE/activities-settings-before-back.txt"
+if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-settings-before-back.txt" | grep -Fq 'com.android.settings'; then
+  fail "Settings did not become foreground before Back test; destination assertion would be invalid"
+fi
+
+adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
+sleep 3
+adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
+if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
+  fail "MyAI did not become foreground before Back test"
+fi
+run_test_tool "back"
+wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
+back_returned_to_settings=0
+for attempt in $(seq 1 15); do
+  recover_unresponsive_dialog || fail "Could not recover emulator dialog while verifying Back destination"
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
+    back_returned_to_settings=1
+    cp "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" "$EVIDENCE/activities-after-back.txt"
+    break
+  fi
+  sleep 1
+done
+if [[ "$back_returned_to_settings" -ne 1 ]]; then
+  adb exec-out screencap -p > "$EVIDENCE/screenshot-after-back-failure.png" 2>/dev/null || true
+  fail "Back was dispatched but Android did not return to the previous Settings activity"
+fi
+echo "PASS: Back returned to the previous foreground Settings activity."
+
 # Capture the full relevant buffers at the end. A functional smoke PASS must not
 # hide an Android system ANR that occurred during this same emulator session.
 adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EVIDENCE/logcat.txt"
