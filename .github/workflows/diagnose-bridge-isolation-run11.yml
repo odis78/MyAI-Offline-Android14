@@ -32,7 +32,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null
+          # setup-android@v4 already accepts SDK licenses. Do not pipe `yes`
+          # into sdkmanager: it exits early after accepting licenses, causing
+          # `yes` to receive SIGPIPE and fail under `set -o pipefail`.
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.11.1
