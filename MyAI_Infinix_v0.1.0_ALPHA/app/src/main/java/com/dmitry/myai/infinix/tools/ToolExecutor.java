@@ -105,27 +105,61 @@ public final class ToolExecutor {
 
     private void collect(AccessibilityNodeInfo node, List<String> out, int depth) {
         if (node == null || depth > 8 || out.size() >= 80) return;
+        final long nodeStart = android.os.SystemClock.elapsedRealtime();
+        long t = android.os.SystemClock.elapsedRealtime();
         CharSequence text = node.getText();
+        long textMs = android.os.SystemClock.elapsedRealtime() - t;
+        t = android.os.SystemClock.elapsedRealtime();
         CharSequence description = node.getContentDescription();
-        if (text != null || description != null || node.isClickable() || node.isEditable()) {
+        long descriptionMs = android.os.SystemClock.elapsedRealtime() - t;
+        t = android.os.SystemClock.elapsedRealtime();
+        boolean clickable = node.isClickable();
+        boolean editable = node.isEditable();
+        long flagsMs = android.os.SystemClock.elapsedRealtime() - t;
+        if (text != null || description != null || clickable || editable) {
             Rect bounds = new Rect();
+            t = android.os.SystemClock.elapsedRealtime();
             node.getBoundsInScreen(bounds);
+            long boundsMs = android.os.SystemClock.elapsedRealtime() - t;
             out.add("{\"text\":" + JSONObject.quote(text == null ? "" : text.toString())
                 + ",\"description\":" + JSONObject.quote(
                     description == null ? "" : description.toString())
-                + ",\"clickable\":" + node.isClickable()
-                + ",\"editable\":" + node.isEditable()
+                + ",\"clickable\":" + clickable
+                + ",\"editable\":" + editable
                 + ",\"bounds\":" + JSONObject.quote(bounds.toShortString()) + "}");
+            if (textMs >= 50 || descriptionMs >= 50 || flagsMs >= 50 || boundsMs >= 50) {
+                android.util.Log.w("MyAI-Infinix", "SCREEN_NODE_SLOW depth=" + depth
+                    + " textMs=" + textMs + " descriptionMs=" + descriptionMs
+                    + " flagsMs=" + flagsMs + " boundsMs=" + boundsMs);
+            }
         }
 
-        for (int i = 0; i < node.getChildCount() && out.size() < 80; i++) {
+        t = android.os.SystemClock.elapsedRealtime();
+        int childCount = node.getChildCount();
+        long childCountMs = android.os.SystemClock.elapsedRealtime() - t;
+        if (childCountMs >= 50) {
+            android.util.Log.w("MyAI-Infinix", "SCREEN_CHILD_COUNT_SLOW depth=" + depth
+                + " elapsedMs=" + childCountMs + " childCount=" + childCount);
+        }
+        for (int i = 0; i < childCount && out.size() < 80; i++) {
+            t = android.os.SystemClock.elapsedRealtime();
             AccessibilityNodeInfo child = node.getChild(i);
+            long getChildMs = android.os.SystemClock.elapsedRealtime() - t;
+            if (getChildMs >= 50) {
+                android.util.Log.w("MyAI-Infinix", "SCREEN_GET_CHILD_SLOW depth=" + depth
+                    + " index=" + i + " elapsedMs=" + getChildMs);
+            }
             if (child == null) continue;
             try {
                 collect(child, out, depth + 1);
             } finally {
                 child.recycle();
             }
+        }
+        long nodeMs = android.os.SystemClock.elapsedRealtime() - nodeStart;
+        if (nodeMs >= 100) {
+            android.util.Log.w("MyAI-Infinix", "SCREEN_NODE_TOTAL_SLOW depth=" + depth
+                + " elapsedMs=" + nodeMs + " children=" + childCount);
         }
     }
 
