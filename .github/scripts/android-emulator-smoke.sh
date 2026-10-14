@@ -213,7 +213,7 @@ printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
 sleep 5
 
 adb shell dumpsys activity activities > "$EVIDENCE/activities.txt"
-if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities.txt" | grep -Fq "$ACTIVITY"; then
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities.txt" | grep -Fq "$ACTIVITY"; then
   fail "MainActivity is not the resumed/foreground activity (process-only check is not enough)"
 fi
 
@@ -291,7 +291,7 @@ ui_has_expected_controls() {
   # No hierarchy dump while Accessibility is enabled. Validate foreground
   # Activity, screenshot capture, and framework binding instead.
   adb shell dumpsys activity activities > "$EVIDENCE/activities-ui-check.txt" 2>&1 || return 1
-  grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-ui-check.txt" |
+  grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-ui-check.txt" |
     grep -Fq "$ACTIVITY" || return 1
   [[ -s "$EVIDENCE/screenshot-current.png" ]] || return 1
   wait_for_accessibility_bound 5
@@ -443,7 +443,7 @@ wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen
 dump_ui || fail "UI dump failed after screen-state test"
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-screen.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
-grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
+grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
 run_test_tool "scroll_up"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
@@ -454,12 +454,66 @@ wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool prot
 dump_ui || true
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
+# Verify Back by destination, not merely by performGlobalAction() returning true.
+# Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
+# assert that Android actually returns to Settings rather than the launcher/home.
+echo "Preparing a clean Settings -> MyAI task transition for Back navigation test"
+# The earlier smoke setup reused MyAI's already-existing task after the Home test.
+# In that case Settings was foreground before launch, but not necessarily the
+# previous task in Android's task history. Force-stop MyAI, open Settings, then
+# start MainActivity in a fresh task so the Back destination assertion is valid.
+adb shell am force-stop "$PKG" || fail "Could not stop MyAI before Back test"
+adb shell am start -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-before-back-start.txt"
+sleep 4
+recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
+adb shell dumpsys activity activities > "$EVIDENCE/activities-settings-before-back.txt"
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-settings-before-back.txt" | grep -Fq 'com.android.settings'; then
+  fail "Settings did not become foreground before Back test; destination assertion would be invalid"
+fi
+
+# Launch normally over Settings. MULTIPLE_TASK would isolate MyAI from Settings
+# and invalidate the expected Back destination.
+adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
+sleep 3
+adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
+  fail "MyAI did not become foreground before Back test"
+fi
+run_test_tool "back"
+wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
+back_returned_to_settings=0
+for attempt in $(seq 1 15); do
+  recover_unresponsive_dialog || fail "Could not recover emulator dialog while verifying Back destination"
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
+    back_returned_to_settings=1
+    cp "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" "$EVIDENCE/activities-after-back.txt"
+    break
+  fi
+  sleep 1
+done
+if [[ "$back_returned_to_settings" -ne 1 ]]; then
+  adb exec-out screencap -p > "$EVIDENCE/screenshot-after-back-failure.png" 2>/dev/null || true
+  fail "Back was dispatched but Android did not return to the previous Settings activity"
+fi
+echo "PASS: Back returned to the previous foreground Settings activity."
+
+# Capture the full relevant buffers at the end. A functional smoke PASS must not
+# hide an Android system ANR that occurred during this same emulator session.
+adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EVIDENCE/logcat.txt"
+grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason:' \
+  "$EVIDENCE/logcat.txt" > "$EVIDENCE/anr-summary-final.txt" 2>/dev/null || true
+
+if grep -Eiq 'ANR in |am_anr|Input dispatching timed out|Application Not Responding:|AppNotRespondingDialog' "$EVIDENCE/logcat.txt"; then
+  capture_anr_traces post-test
+  fail "ANR/AppNotRespondingDialog evidence found in final logcat; smoke run is not PASS even if functional actions completed"
+fi
+
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
-adb logcat -d -t 8000 > "$EVIDENCE/logcat.txt"
 if grep -E 'FATAL EXCEPTION|Process: com\.dmitry\.myai\.infinix, PID:' "$EVIDENCE/logcat.txt" | grep -q .; then
   fail "Fatal application exception found in logcat"
 fi
 adb exec-out screencap -p > "$EVIDENCE/android-emulator.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-final.txt"
 cp "$APK" "$EVIDENCE/app-debug.apk"
-echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, tool-protocol action, and crash scan all passed."
+echo "PASS: install, foreground Activity, visible controls, Accessibility Bridge connection, screen-state action, Back destination assertion, and crash scan all passed; no ANR signature found in captured final logcat."

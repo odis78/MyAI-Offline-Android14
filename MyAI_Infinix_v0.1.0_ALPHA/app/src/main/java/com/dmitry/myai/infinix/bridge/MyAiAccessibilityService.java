@@ -37,7 +37,20 @@ public class MyAiAccessibilityService extends AccessibilityService {
                 : "SERVICE REBOUND — INFINIX ALPHA count=" + count);
         publish();
     }
-    @Override public void onAccessibilityEvent(AccessibilityEvent e){}
+    @Override public void onAccessibilityEvent(AccessibilityEvent e){
+        if (e == null) return;
+        int type = e.getEventType();
+        // Diagnostic-only instrumentation: capture the foreground window transitions
+        // around the Back action without changing navigation behavior.
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            CharSequence pkg = e.getPackageName();
+            CharSequence cls = e.getClassName();
+            log("NAV_WINDOW type=" + type
+                    + " package=" + (pkg == null ? "?" : pkg)
+                    + " class=" + (cls == null ? "?" : cls));
+        }
+    }
     @Override public void onInterrupt(){ log("SERVICE INTERRUPTED"); }
     @Override public boolean onUnbind(Intent intent){
         if(instance==this) instance=null;
