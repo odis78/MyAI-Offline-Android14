@@ -457,7 +457,12 @@ cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 # Verify Back by destination, not merely by performGlobalAction() returning true.
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
 # assert that Android actually returns to Settings rather than the launcher/home.
-echo "Preparing Settings as the previous foreground app for Back navigation test"
+echo "Preparing a clean Settings -> MyAI task transition for Back navigation test"
+# The earlier smoke setup reused MyAI's already-existing task after the Home test.
+# In that case Settings was foreground before launch, but not necessarily the
+# previous task in Android's task history. Force-stop MyAI, open Settings, then
+# start MainActivity in a fresh task so the Back destination assertion is valid.
+adb shell am force-stop "$PKG" || fail "Could not stop MyAI before Back test"
 adb shell am start -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-before-back-start.txt"
 sleep 4
 recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
@@ -466,7 +471,9 @@ if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-setting
   fail "Settings did not become foreground before Back test; destination assertion would be invalid"
 fi
 
-adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
+# 0x18000000 = FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_MULTIPLE_TASK.
+# This avoids reusing the prior MyAI task whose history was changed by the Home test.
+adb shell am start -n "$ACTIVITY" -f 0x18000000 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
 sleep 3
 adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
 if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
