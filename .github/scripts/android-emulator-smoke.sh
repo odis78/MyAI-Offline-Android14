@@ -213,7 +213,7 @@ printf '%s\n' "$start_output" | tee "$EVIDENCE/activity-start.txt"
 sleep 5
 
 adb shell dumpsys activity activities > "$EVIDENCE/activities.txt"
-if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities.txt" | grep -Fq "$ACTIVITY"; then
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities.txt" | grep -Fq "$ACTIVITY"; then
   fail "MainActivity is not the resumed/foreground activity (process-only check is not enough)"
 fi
 
@@ -291,7 +291,7 @@ ui_has_expected_controls() {
   # No hierarchy dump while Accessibility is enabled. Validate foreground
   # Activity, screenshot capture, and framework binding instead.
   adb shell dumpsys activity activities > "$EVIDENCE/activities-ui-check.txt" 2>&1 || return 1
-  grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-ui-check.txt" |
+  grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-ui-check.txt" |
     grep -Fq "$ACTIVITY" || return 1
   [[ -s "$EVIDENCE/screenshot-current.png" ]] || return 1
   wait_for_accessibility_bound 5
@@ -443,7 +443,7 @@ wait_for_tool_result "get_screen_state" "TOOL_RESULT get_screen_state: OK screen
 dump_ui || fail "UI dump failed after screen-state test"
 cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-screen.png"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-after-screen.txt"
-grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
+grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-screen.txt" | grep -Fq "$ACTIVITY" || fail "App left foreground after screen-state tool"
 
 run_test_tool "scroll_up"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
@@ -467,7 +467,7 @@ adb shell am start -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-b
 sleep 4
 recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
 adb shell dumpsys activity activities > "$EVIDENCE/activities-settings-before-back.txt"
-if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-settings-before-back.txt" | grep -Fq 'com.android.settings'; then
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-settings-before-back.txt" | grep -Fq 'com.android.settings'; then
   fail "Settings did not become foreground before Back test; destination assertion would be invalid"
 fi
 
@@ -476,7 +476,7 @@ fi
 adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
 sleep 3
 adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
-if ! grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
+if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
   fail "MyAI did not become foreground before Back test"
 fi
 run_test_tool "back"
@@ -485,7 +485,7 @@ back_returned_to_settings=0
 for attempt in $(seq 1 15); do
   recover_unresponsive_dialog || fail "Could not recover emulator dialog while verifying Back destination"
   adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || true
-  if grep -E 'mResumedActivity|topResumedActivity' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
     back_returned_to_settings=1
     cp "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" "$EVIDENCE/activities-after-back.txt"
     break
