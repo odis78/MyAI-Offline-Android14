@@ -465,7 +465,11 @@ echo "Preparing a clean Settings -> MyAI task transition for Back navigation tes
 # launch result, poll the actual resumed activity, and retry after dialog recovery.
 # If the emulator still cannot foreground Settings, record an INCONCLUSIVE setup
 # result and stop before dispatching Back; do not label it a Back regression.
-adb shell am force-stop "$PKG" || fail "Could not stop MyAI before Back test"
+# Do NOT force-stop MyAI here: Android force-stop terminates the package AccessibilityService
+# and can leave the enabled service unbound when MainActivity is relaunched. Keep the live
+# service and place Settings above MyAI so this test measures Back, not service recovery.
+adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-back-transition.txt" 2>&1 || true
+wait_for_accessibility_bound 5 || fail "Accessibility Bridge was not bound before Back test setup"
 settings_foreground=0
 for attempt in $(seq 1 3); do
   recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
@@ -505,6 +509,8 @@ adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.t
 if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
   fail "MyAI did not become foreground before Back test"
 fi
+# Never dispatch Back unless Android confirms the AccessibilityService remains enabled and bound.
+wait_for_accessibility_bound 15 || fail "Accessibility Bridge is not bound after Settings -> MyAI transition; Back was not dispatched"
 run_test_tool "back"
 wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
 back_returned_to_settings=0
