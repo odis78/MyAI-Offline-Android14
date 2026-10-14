@@ -458,18 +458,48 @@ cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
 # assert that Android actually returns to Settings rather than the launcher/home.
 echo "Preparing a clean Settings -> MyAI task transition for Back navigation test"
-# The earlier smoke setup reused MyAI's already-existing task after the Home test.
-# In that case Settings was foreground before launch, but not necessarily the
-# previous task in Android's task history. Force-stop MyAI, open Settings, then
-# start MainActivity in a fresh task so the Back destination assertion is valid.
-adb shell am force-stop "$PKG" || fail "Could not stop MyAI before Back test"
-adb shell am start -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-before-back-start.txt"
-sleep 4
-recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
-adb shell dumpsys activity activities > "$EVIDENCE/activities-settings-before-back.txt"
-if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-settings-before-back.txt" | grep -Fq 'com.android.settings'; then
-  fail "Settings did not become foreground before Back test; destination assertion would be invalid"
+# The previous version used one implicit am start + a fixed 4-second sleep.
+# On the headless API 34 image Settings may start late or be hidden by a system
+# ANR dialog, causing a false Back-test failure before Back is even dispatched.
+# Use the observed Android 14 Settings entry point, wait for ActivityManager's
+# launch result, poll the actual resumed activity, and retry after dialog recovery.
+# If the emulator still cannot foreground Settings, record an INCONCLUSIVE setup
+# result and stop before dispatching Back; do not label it a Back regression.
+# Do NOT force-stop MyAI here: Android force-stop terminates the package AccessibilityService
+# and can leave the enabled service unbound when MainActivity is relaunched. Keep the live
+# service and place Settings above MyAI so this test measures Back, not service recovery.
+adb shell dumpsys accessibility > "$EVIDENCE/accessibility-before-back-transition.txt" 2>&1 || true
+wait_for_accessibility_bound 5 || fail "Accessibility Bridge was not bound before Back test setup"
+settings_foreground=0
+for attempt in $(seq 1 3); do
+  recover_unresponsive_dialog || fail "Could not recover emulator dialog while preparing Back test"
+  if [[ "$attempt" -eq 1 ]]; then
+    adb shell am start -W -n com.android.settings/.homepage.SettingsHomepageActivity 2>&1 | tee "$EVIDENCE/settings-before-back-start-$attempt.txt" || true
+  else
+    adb shell am start -W -a android.settings.SETTINGS 2>&1 | tee "$EVIDENCE/settings-before-back-start-$attempt.txt" || true
+  fi
+  for poll in $(seq 1 12); do
+    recover_unresponsive_dialog || break
+    adb shell dumpsys activity activities > "$EVIDENCE/activities-settings-before-back-attempt-${attempt}-poll-${poll}.txt" 2>&1 || true
+    if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-settings-before-back-attempt-${attempt}-poll-${poll}.txt" | grep -Fq 'com.android.settings'; then
+      cp "$EVIDENCE/activities-settings-before-back-attempt-${attempt}-poll-${poll}.txt" "$EVIDENCE/activities-settings-before-back.txt"
+      settings_foreground=1
+      break
+    fi
+    sleep 1
+  done
+  [[ "$settings_foreground" -eq 1 ]] && break
+  sleep 2
+done
+if [[ "$settings_foreground" -ne 1 ]]; then
+  adb shell dumpsys window windows > "$EVIDENCE/windows-settings-foreground-failure.txt" 2>&1 || true
+  adb exec-out screencap -p > "$EVIDENCE/screenshot-settings-foreground-failure.png" 2>/dev/null || true
+  adb shell dumpsys accessibility > "$EVIDENCE/accessibility-settings-foreground-failure.txt" 2>&1 || true
+  adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EVIDENCE/logcat-settings-foreground-failure.txt" 2>&1 || true
+  echo "INCONCLUSIVE: Settings could not be confirmed foreground after 3 launch attempts; Back was not dispatched." | tee "$EVIDENCE/back-test-setup-result.txt"
+  fail "Back test setup inconclusive: Settings did not reach foreground; no conclusion about MyAI Back behavior"
 fi
+echo "SETTINGS_FOREGROUND_CONFIRMED: Back destination setup is valid" | tee "$EVIDENCE/back-test-setup-result.txt"
 
 # Launch normally over Settings. MULTIPLE_TASK would isolate MyAI from Settings
 # and invalidate the expected Back destination.
@@ -479,6 +509,8 @@ adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.t
 if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
   fail "MyAI did not become foreground before Back test"
 fi
+# Never dispatch Back unless Android confirms the AccessibilityService remains enabled and bound.
+wait_for_accessibility_bound 15 || fail "Accessibility Bridge is not bound after Settings -> MyAI transition; Back was not dispatched"
 run_test_tool "back"
 wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
 back_returned_to_settings=0
