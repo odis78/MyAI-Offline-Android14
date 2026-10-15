@@ -1,0 +1,147 @@
+name: Run 13 - Fail-Closed Back Diagnostics
+
+on:
+  push:
+    branches:
+      - diagnostic/back-navigation-run13
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Static checks and diagnostic APK build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          # setup-android@v4 already accepts SDK licenses. Do not pipe `yes`
+          # into sdkmanager: it exits early after accepting licenses, causing
+          # `yes` to receive SIGPIPE and fail under `set -o pipefail`.
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Run source sanity checks
+        shell: bash
+        run: bash MyAI_Infinix_v0.1.0_ALPHA/sanity_check.sh
+
+      - name: Build diagnostic debug APK
+        working-directory: MyAI_Infinix_v0.1.0_ALPHA
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Upload diagnostic APK for isolated emulator jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-run13-debug-apk
+          path: MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  control-baseline:
+    name: Control A - Settings to MyAI without tool calls
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout diagnostic scripts
+        uses: actions/checkout@v4
+
+      - name: Download diagnostic APK
+        uses: actions/download-artifact@v4
+        with:
+          name: myai-run13-debug-apk
+          path: run13-apk
+
+      - name: Place APK at expected path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
+          APK="$(find run13-apk -type f -name app-debug.apk -print -quit)"
+          test -n "$APK"
+          cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Run no-tool control on clean emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-control-baseline.sh"
+
+      - name: Upload control-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-back-run13-control
+          path: test-bridge/android-evidence/run13-control/
+          if-no-files-found: warn
+          retention-days: 30
+
+  tool-smoke:
+    name: Control B - Existing tool smoke on a separate clean emulator
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout diagnostic scripts
+        uses: actions/checkout@v4
+
+      - name: Download diagnostic APK
+        uses: actions/download-artifact@v4
+        with:
+          name: myai-run13-debug-apk
+          path: run13-apk
+
+      - name: Place APK at expected path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
+          APK="$(find run13-apk -type f -name app-debug.apk -print -quit)"
+          test -n "$APK"
+          cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Run existing tool smoke on separate clean emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/android-emulator-smoke.sh"
+
+      - name: Upload tool-smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myai-back-run13-tool-smoke
+          path: test-bridge/android-evidence/
+          if-no-files-found: warn
+          retention-days: 30
