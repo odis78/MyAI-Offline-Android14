@@ -324,7 +324,7 @@ public final class ToolExecutor {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
                 context.startActivity(intent);
                 return ToolResult.ok("back", "reopened last app: " + lastPackage,
-                    "{\\"package\\":" + JSONObject.quote(lastPackage) + "}");
+                    "{" + "\"package\":" + JSONObject.quote(lastPackage) + "}");
             }
             android.util.Log.w("MyAI-Infinix", "NAV_BACK_LAST_APP_UNAVAILABLE package=" + lastPackage);
         }
