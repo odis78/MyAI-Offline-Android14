@@ -570,7 +570,7 @@ fi
 # Never dispatch Back unless Android confirms the AccessibilityService remains enabled and bound.
 wait_for_accessibility_bound 15 || fail "Accessibility Bridge is not bound after Settings -> MyAI transition; Back was not dispatched"
 run_test_tool "back"
-wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
+wait_for_tool_result "back" "TOOL_RESULT back: OK reopened last app: com.android.settings" || wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report success"
 back_returned_to_settings=0
 for attempt in $(seq 1 15); do
   # Do not dismiss an ANR overlay and then treat the resulting navigation as a
