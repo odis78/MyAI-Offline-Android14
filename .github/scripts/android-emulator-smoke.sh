@@ -448,6 +448,27 @@ grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resume
 run_test_tool "scroll_up"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
 
+# ANRs can appear while the emulator boots, long before Back is dispatched.
+# A focused system ANR dialog intercepts the Accessibility global action; in that
+# state a "Back failed" verdict is invalid. Preserve evidence and stop as
+# INCONCLUSIVE before changing the task stack or dispatching Back.
+echo "Pre-Back environment health gate"
+adb logcat -d -b main -b system -b events -b crash -v threadtime -t 20000 > "$EVIDENCE/logcat-pre-back-gate.txt" 2>&1 || {
+  echo "INCONCLUSIVE: Could not read logcat before Back; environment health is unknown." | tee "$EVIDENCE/back-test-result.txt"
+  capture_failure_evidence "pre-back-logcat-unavailable"
+  exit 2
+}
+adb shell dumpsys window windows > "$EVIDENCE/windows-pre-back-gate.txt" 2>&1 || {
+  echo "INCONCLUSIVE: WindowManager state unavailable before Back; cannot validate input focus." | tee "$EVIDENCE/back-test-result.txt"
+  capture_failure_evidence "pre-back-window-state-unavailable"
+  exit 2
+}
+if grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding|ANR in (com[.]android[.]systemui|com[.]android[.]phone|com[.]android[.]bluetooth|system)|am_anr.*(com[.]android[.]systemui|com[.]android[.]phone|com[.]android[.]bluetooth|system)|Application Not Responding: (system|System UI|Settings|Phone|Bluetooth)' "$EVIDENCE/logcat-pre-back-gate.txt" "$EVIDENCE/windows-pre-back-gate.txt"; then
+  echo "INCONCLUSIVE: System/UI ANR was observed before Back dispatch; no navigation verdict." | tee "$EVIDENCE/back-test-result.txt"
+  capture_failure_evidence "anr-before-back-dispatch"
+  exit 2
+fi
+
 # Verify Back by destination, not merely by performGlobalAction() returning true.
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
 # assert that Android actually returns to Settings rather than the launcher/home.
@@ -515,13 +536,24 @@ back_returned_to_settings=0
 for attempt in $(seq 1 15); do
   # Do not dismiss an ANR overlay and then treat the resulting navigation as a
   # clean Back test. Preserve evidence and classify this run as inconclusive.
-  if anr_window_visible; then
+  # Read WindowManager directly and fail closed if the command times out or
+  # returns no data. Under system_server ANR, the old helper could treat a
+  # timed-out dumpsys as "no overlay" and incorrectly report a Back failure.
+  if ! adb shell dumpsys window windows > "$EVIDENCE/windows-after-back-attempt-${attempt}.txt" 2>&1 || [[ ! -s "$EVIDENCE/windows-after-back-attempt-${attempt}.txt" ]]; then
+    echo "INCONCLUSIVE: WindowManager snapshot failed during Back verification." | tee "$EVIDENCE/back-test-result.txt"
+    capture_failure_evidence "window-state-unavailable-during-back"
+    exit 2
+  fi
+  if grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding' "$EVIDENCE/windows-after-back-attempt-${attempt}.txt"; then
     capture_failure_evidence "anr-during-back-verification"
     echo "INCONCLUSIVE: ANR dialog owns window focus during Back verification; no Back verdict." | tee "$EVIDENCE/back-test-result.txt"
     exit 2
   fi
-  adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || true
-  adb shell dumpsys window windows > "$EVIDENCE/windows-after-back-attempt-${attempt}.txt" 2>&1 || true
+  if ! adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || [[ ! -s "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" ]]; then
+    echo "INCONCLUSIVE: ActivityManager snapshot failed during Back verification." | tee "$EVIDENCE/back-test-result.txt"
+    capture_failure_evidence "activity-state-unavailable-during-back"
+    exit 2
+  fi
   if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
     back_returned_to_settings=1
     cp "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" "$EVIDENCE/activities-after-back.txt"
