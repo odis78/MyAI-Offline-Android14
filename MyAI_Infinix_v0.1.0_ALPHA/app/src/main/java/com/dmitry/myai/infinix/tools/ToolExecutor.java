@@ -55,10 +55,7 @@ public final class ToolExecutor {
                     MyAiAccessibilityService.scrollUp();
                     result = ToolResult.ok("scroll_up", "scroll dispatched", "{}");
                     break;
-                case "back":
-                    MyAiAccessibilityService.back();
-                    result = ToolResult.ok("back", "dispatched", "{}");
-                    break;
+                case "back": result = backToLastOpenedApp(); break;
                 case "home":
                     MyAiAccessibilityService.home();
                     result = ToolResult.ok("home", "dispatched", "{}");
@@ -317,6 +314,24 @@ public final class ToolExecutor {
         return ToolResult.fail("wait_for", "timeout: " + text);
     }
 
+    private ToolResult backToLastOpenedApp() {
+        String lastPackage = context.getSharedPreferences("myai_navigation", Context.MODE_PRIVATE)
+            .getString("last_opened_package", null);
+        if (lastPackage != null && !lastPackage.isEmpty()
+                && !context.getPackageName().equals(lastPackage)) {
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(lastPackage);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                context.startActivity(intent);
+                return ToolResult.ok("back", "reopened last app: " + lastPackage,
+                    "{\\"package\\":" + JSONObject.quote(lastPackage) + "}");
+            }
+            android.util.Log.w("MyAI-Infinix", "NAV_BACK_LAST_APP_UNAVAILABLE package=" + lastPackage);
+        }
+        MyAiAccessibilityService.back();
+        return ToolResult.ok("back", "dispatched", "{}");
+    }
+
     private ToolResult openApp(String packageName) {
         if (packageName == null || packageName.isEmpty()) {
             return ToolResult.fail("open_app", "missing package");
@@ -327,6 +342,8 @@ public final class ToolExecutor {
         // expected MyAI -> target app -> MyAI Back stack instead of creating or
         // foregrounding a separate task based on package task affinity.
         // Keep this behavior covered by the isolated Run 15 regression smoke test.
+        context.getSharedPreferences("myai_navigation", Context.MODE_PRIVATE).edit()
+            .putString("last_opened_package", packageName).apply();
         context.startActivity(intent);
         return ToolResult.ok("open_app", "launch dispatched",
             "{\"package\":" + JSONObject.quote(packageName) + "}");
