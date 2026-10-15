@@ -609,6 +609,48 @@ if [[ "$back_returned_to_settings" -ne 1 ]]; then
 fi
 echo "PASS: Back returned to the previous foreground Settings activity." | tee "$EVIDENCE/back-test-result.txt"
 
+# Regression for the user's exact scenario: open YouTube from MyAI, system-Back to MyAI,
+# then issue the in-chat "back" tool and verify YouTube is foreground again.
+echo "Testing MyAI chat Back reopens the last app launched by MyAI (YouTube)"
+run_test_tool "open_app" '{"package":"com.google.android.youtube"}'
+wait_for_tool_result "open_app" "TOOL_RESULT open_app: OK launch dispatched" || fail "open_app(YouTube) did not report success"
+youtube_opened=0
+for attempt in $(seq 1 15); do
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-open-app-youtube-\${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-open-app-youtube-\${attempt}.txt" | grep -Fq "com.google.android.youtube"; then
+    youtube_opened=1
+    break
+  fi
+  sleep 1
+done
+[[ "$youtube_opened" -eq 1 ]] || fail "open_app did not bring YouTube to foreground"
+adb shell input keyevent 4 || fail "Could not return from YouTube to MyAI with system Back"
+myai_returned_from_youtube=0
+for attempt in $(seq 1 15); do
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-return-from-youtube-\${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-return-from-youtube-\${attempt}.txt" | grep -Fq "$ACTIVITY"; then
+    myai_returned_from_youtube=1
+    break
+  fi
+  sleep 1
+done
+[[ "$myai_returned_from_youtube" -eq 1 ]] || fail "System Back from YouTube did not return to MyAI"
+wait_for_accessibility_bound 10 || fail "Accessibility Bridge not bound after returning from YouTube"
+run_test_tool "back"
+wait_for_tool_result "back" "TOOL_RESULT back: OK reopened last app: com.google.android.youtube" || fail "MyAI back command did not reopen the last app"
+youtube_reopened=0
+for attempt in $(seq 1 15); do
+  adb shell dumpsys activity activities > "$EVIDENCE/activities-youtube-reopened-\${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-youtube-reopened-\${attempt}.txt" | grep -Fq "com.google.android.youtube"; then
+    youtube_reopened=1
+    cp "$EVIDENCE/activities-youtube-reopened-\${attempt}.txt" "$EVIDENCE/activities-youtube-reopened.txt"
+    break
+  fi
+  sleep 1
+done
+[[ "$youtube_reopened" -eq 1 ]] || fail "MyAI chat Back did not return to YouTube"
+echo "PASS: MyAI chat Back reopened the last app launched by MyAI (YouTube)."
+
 # Run Home only after Back is fully measured; Home must not contaminate Back's task-stack setup.
 run_test_tool "home"
 wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool protocol home command did not report success"
