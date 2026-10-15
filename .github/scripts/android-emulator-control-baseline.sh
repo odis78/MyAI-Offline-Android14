@@ -6,7 +6,7 @@ set -uo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 PROJECT="$ROOT/MyAI_Infinix_v0.1.0_ALPHA"
 APK="$PROJECT/app/build/outputs/apk/debug/app-debug.apk"
-EVIDENCE="$ROOT/test-bridge/android-evidence/run11-control"
+EVIDENCE="$ROOT/test-bridge/android-evidence/run12-control"
 PKG="com.dmitry.myai.infinix"
 ACTIVITY="$PKG/.MainActivity"
 SERVICE="$PKG/com.dmitry.myai.infinix.bridge.MyAiAccessibilityService"
