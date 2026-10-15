@@ -27,7 +27,9 @@ public final class ToolExecutor {
     private final VerificationEngine verification = new VerificationEngine();
 
     public ToolExecutor(Context context, PolicyGate policy) {
-        this.context = context.getApplicationContext();
+        // Keep the Activity context so app launches join the caller's task stack.
+        // ToolExecutor is owned by MainActivity/ToolAgent and is not a process singleton.
+        this.context = context;
         this.policy = policy;
     }
 
@@ -321,7 +323,9 @@ public final class ToolExecutor {
         }
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
         if (intent == null) return ToolResult.fail("open_app", "package not found: " + packageName);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        // Launch from the caller Activity without NEW_TASK. This preserves the
+        // expected MyAI -> target app -> MyAI Back stack instead of creating or
+        // foregrounding a separate task based on package task affinity.
         context.startActivity(intent);
         return ToolResult.ok("open_app", "launch dispatched",
             "{\"package\":" + JSONObject.quote(packageName) + "}");
