@@ -432,9 +432,11 @@ wait_for_tool_result() {
 # avoids false failures from layout, density, or system ANR overlays.
 run_test_tool() {
   local tool="$1"
+  local args="${2-}"
+  [[ -n "$args" ]] || args="{}"
   recover_unresponsive_dialog || fail "Could not recover from emulator dialog before $tool test"
-  echo "Dispatching smoke tool through Activity intent: $tool"
-  adb shell am start -n "$ACTIVITY" --es myai_test_tool "$tool" || fail "Could not dispatch smoke intent for $tool"
+  echo "Dispatching smoke tool through Activity intent: $tool args=$args"
+  adb shell am start -n "$ACTIVITY" --es myai_test_tool "$tool" --es myai_test_args "$args" || fail "Could not dispatch smoke intent for $tool"
   sleep 2
 }
 
