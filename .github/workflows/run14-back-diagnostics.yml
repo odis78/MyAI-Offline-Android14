@@ -70,7 +70,7 @@ jobs:
       - name: Download diagnostic APK
         uses: actions/download-artifact@v4
         with:
-          name: myai-run15-debug-apk
+          name: myai-run16-debug-apk
           path: run14-apk
 
       - name: Place APK at expected path
@@ -130,7 +130,7 @@ jobs:
       - name: Download diagnostic APK
         uses: actions/download-artifact@v4
         with:
-          name: myai-run15-debug-apk
+          name: myai-run16-debug-apk
           path: run14-apk
 
       - name: Place APK at expected path
