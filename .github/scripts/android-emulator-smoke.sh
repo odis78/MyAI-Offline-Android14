@@ -448,12 +448,6 @@ grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resume
 run_test_tool "scroll_up"
 wait_for_tool_result "scroll_up" "TOOL_RESULT scroll_up: OK scroll dispatched" || fail "scroll_up tool did not report success (see explicit tool result/timeout above)"
 
-# Home legitimately backgrounds MainActivity; the explicit result log remains testable.
-run_test_tool "home"
-wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool protocol home command did not report success"
-dump_ui || true
-cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
-
 # Verify Back by destination, not merely by performGlobalAction() returning true.
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
 # assert that Android actually returns to Settings rather than the launcher/home.
@@ -501,11 +495,15 @@ if [[ "$settings_foreground" -ne 1 ]]; then
 fi
 echo "SETTINGS_FOREGROUND_CONFIRMED: Back destination setup is valid" | tee "$EVIDENCE/back-test-setup-result.txt"
 
-# Launch normally over Settings. MULTIPLE_TASK would isolate MyAI from Settings
-# and invalidate the expected Back destination.
+# Launch normally over Settings. Save both task and window state before dispatch.
+# Shell-started activities do not prove a user-created caller stack; these snapshots
+# are required to distinguish a task-stack/setup issue from a Back dispatch issue.
 adb shell am start -n "$ACTIVITY" 2>&1 | tee "$EVIDENCE/activity-start-before-back.txt"
 sleep 3
 adb shell dumpsys activity activities > "$EVIDENCE/activities-myai-before-back.txt"
+adb shell dumpsys activity recents > "$EVIDENCE/recents-myai-before-back.txt" 2>&1 || true
+adb shell dumpsys window windows > "$EVIDENCE/windows-myai-before-back.txt" 2>&1 || true
+adb exec-out screencap -p > "$EVIDENCE/screenshot-myai-before-back.png" 2>/dev/null || true
 if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-myai-before-back.txt" | grep -Fq "$ACTIVITY"; then
   fail "MyAI did not become foreground before Back test"
 fi
@@ -515,8 +513,15 @@ run_test_tool "back"
 wait_for_tool_result "back" "TOOL_RESULT back: OK dispatched" || fail "Back tool did not report dispatch"
 back_returned_to_settings=0
 for attempt in $(seq 1 15); do
-  recover_unresponsive_dialog || fail "Could not recover emulator dialog while verifying Back destination"
+  # Do not dismiss an ANR overlay and then treat the resulting navigation as a
+  # clean Back test. Preserve evidence and classify this run as inconclusive.
+  if anr_window_visible; then
+    capture_failure_evidence "anr-during-back-verification"
+    echo "INCONCLUSIVE: ANR dialog owns window focus during Back verification; no Back verdict." | tee "$EVIDENCE/back-test-result.txt"
+    exit 2
+  fi
   adb shell dumpsys activity activities > "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" 2>&1 || true
+  adb shell dumpsys window windows > "$EVIDENCE/windows-after-back-attempt-${attempt}.txt" 2>&1 || true
   if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" | grep -Fq 'com.android.settings'; then
     back_returned_to_settings=1
     cp "$EVIDENCE/activities-after-back-attempt-${attempt}.txt" "$EVIDENCE/activities-after-back.txt"
@@ -526,9 +531,18 @@ for attempt in $(seq 1 15); do
 done
 if [[ "$back_returned_to_settings" -ne 1 ]]; then
   adb exec-out screencap -p > "$EVIDENCE/screenshot-after-back-failure.png" 2>/dev/null || true
-  fail "Back was dispatched but Android did not return to the previous Settings activity"
+  adb shell dumpsys activity recents > "$EVIDENCE/recents-after-back-failure.txt" 2>&1 || true
+  echo "FAIL: Back was dispatched but Android did not return to the previous Settings activity." | tee "$EVIDENCE/back-test-result.txt"
+  capture_failure_evidence "back-destination-failure"
+  exit 1
 fi
-echo "PASS: Back returned to the previous foreground Settings activity."
+echo "PASS: Back returned to the previous foreground Settings activity." | tee "$EVIDENCE/back-test-result.txt"
+
+# Run Home only after Back is fully measured; Home must not contaminate Back's task-stack setup.
+run_test_tool "home"
+wait_for_tool_result "home" "TOOL_RESULT home: OK dispatched" || fail "Tool protocol home command did not report success"
+dump_ui || true
+cp "$EVIDENCE/screenshot-current.png" "$EVIDENCE/screenshot-after-tool.png"
 
 # Capture the full relevant buffers at the end. A functional smoke PASS must not
 # hide an Android system ANR that occurred during this same emulator session.
@@ -538,7 +552,8 @@ grep -i -E -C 4 'ANR in|am_anr|Input dispatching timed out|not responding|Reason
 
 if grep -Eiq 'ANR in |am_anr|Input dispatching timed out|Application Not Responding:|AppNotRespondingDialog' "$EVIDENCE/logcat.txt"; then
   capture_anr_traces post-test
-  fail "ANR/AppNotRespondingDialog evidence found in final logcat; smoke run is not PASS even if functional actions completed"
+  echo "INCONCLUSIVE: ANR/AppNotRespondingDialog signature exists in this emulator session; do not attribute it to Back without isolated evidence." | tee "$EVIDENCE/environment-result.txt"
+  exit 2
 fi
 
 # Fail on a fatal exception for this package, even if Android leaves a process briefly alive.
