@@ -326,6 +326,7 @@ public final class ToolExecutor {
         // Launch from the caller Activity without NEW_TASK. This preserves the
         // expected MyAI -> target app -> MyAI Back stack instead of creating or
         // foregrounding a separate task based on package task affinity.
+        // Keep this behavior covered by the isolated Run 15 regression smoke test.
         context.startActivity(intent);
         return ToolResult.ok("open_app", "launch dispatched",
             "{\"package\":" + JSONObject.quote(packageName) + "}");
