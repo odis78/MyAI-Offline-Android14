@@ -463,11 +463,17 @@ adb shell dumpsys window windows > "$EVIDENCE/windows-pre-back-gate.txt" 2>&1 ||
   capture_failure_evidence "pre-back-window-state-unavailable"
   exit 2
 }
-if grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding|ANR in (com[.]android[.]systemui|com[.]android[.]phone|com[.]android[.]bluetooth|system)|am_anr.*(com[.]android[.]systemui|com[.]android[.]phone|com[.]android[.]bluetooth|system)|Application Not Responding: (system|System UI|Settings|Phone|Bluetooth)' "$EVIDENCE/logcat-pre-back-gate.txt" "$EVIDENCE/windows-pre-back-gate.txt"; then
-  echo "INCONCLUSIVE: System/UI ANR was observed before Back dispatch; no navigation verdict." | tee "$EVIDENCE/back-test-result.txt"
+# The captured logcat intentionally contains the entire preceding test session.
+# Historical ANR records must remain in the evidence but must not block this
+# gate after the dialog has been dismissed. Only a currently focused ANR window
+# can intercept Back at this moment; the earlier run incorrectly treated any
+# boot-time ANR in the ring buffer as a current blocker.
+if grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Application Not Responding|Application Not Responding: (system|System UI|Settings|Phone|Bluetooth)' "$EVIDENCE/windows-pre-back-gate.txt"; then
+  echo "INCONCLUSIVE: An ANR dialog currently owns input focus before Back; no navigation verdict." | tee "$EVIDENCE/back-test-result.txt"
   capture_failure_evidence "anr-before-back-dispatch"
   exit 2
 fi
+echo "Pre-Back gate passed: no focused system ANR dialog; historical ANRs retained as evidence."
 
 # Verify Back by destination, not merely by performGlobalAction() returning true.
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
