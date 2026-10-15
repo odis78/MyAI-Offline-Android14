@@ -6,7 +6,7 @@ set -uo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 PROJECT="$ROOT/MyAI_Infinix_v0.1.0_ALPHA"
 APK="$PROJECT/app/build/outputs/apk/debug/app-debug.apk"
-EVIDENCE="$ROOT/test-bridge/android-evidence/run13-control"
+EVIDENCE="$ROOT/test-bridge/android-evidence/run14-control"
 PKG="com.dmitry.myai.infinix"
 ACTIVITY="$PKG/.MainActivity"
 SERVICE="$PKG/com.dmitry.myai.infinix.bridge.MyAiAccessibilityService"
@@ -84,7 +84,7 @@ wait_for_bound() {
   return 1
 }
 
-echo "RUN 11 CONTROL: Settings -> MyAI transition with NO MyAI tool intents."
+echo "RUN 14 CONTROL: Settings -> MyAI transition with NO MyAI tool intents."
 [[ -s "$APK" ]] || { echo "CONTROL_SETUP_FAIL: APK missing: $APK"; exit 2; }
 adb_bounded start-server || true
 adb_bounded wait-for-device || { echo "CONTROL_SETUP_FAIL: adb device unavailable"; exit 2; }
