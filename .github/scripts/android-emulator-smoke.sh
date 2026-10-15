@@ -477,6 +477,37 @@ if grep -Eiq 'mCurrentFocus=.*Application Not Responding|mFocusedWindow=.*Applic
 fi
 echo "Pre-Back gate passed: no focused system ANR dialog; historical ANRs retained as evidence."
 
+# Regression: launching a target app from MyAI must preserve the caller task stack.
+# System Back from Settings should return to MyAI, not the launcher.
+echo "Testing MyAI -> open_app(Settings) -> system Back -> MyAI"
+run_test_tool "open_app" '{"package":"com.android.settings"}'
+wait_for_tool_result "open_app" "TOOL_RESULT open_app: OK launch dispatched" || fail "open_app(Settings) did not report success"
+settings_opened=0
+for attempt in $(seq 1 15); do
+  adb shell dumpsys activity activities > "${EVIDENCE}/activities-open-app-settings-${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "${EVIDENCE}/activities-open-app-settings-${attempt}.txt" | grep -Fq "com.android.settings"; then
+    settings_opened=1
+    cp "${EVIDENCE}/activities-open-app-settings-${attempt}.txt" "${EVIDENCE}/activities-open-app-settings.txt"
+    break
+  fi
+  sleep 1
+done
+[[ "$settings_opened" -eq 1 ]] || fail "open_app did not bring Settings to foreground"
+adb shell input keyevent 4 || fail "Could not dispatch system Back from Settings"
+myai_returned=0
+for attempt in $(seq 1 15); do
+  adb shell dumpsys activity activities > "${EVIDENCE}/activities-return-to-myai-${attempt}.txt" 2>&1 || true
+  if grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|^[[:space:]]*Resumed:' "${EVIDENCE}/activities-return-to-myai-${attempt}.txt" | grep -Fq "$ACTIVITY"; then
+    myai_returned=1
+    cp "${EVIDENCE}/activities-return-to-myai-${attempt}.txt" "${EVIDENCE}/activities-return-to-myai.txt"
+    break
+  fi
+  sleep 1
+done
+[[ "$myai_returned" -eq 1 ]] || fail "System Back from Settings did not return to MyAI; task-stack regression"
+echo "PASS: open_app(Settings) preserved Back navigation to MyAI."
+wait_for_accessibility_bound 10 || fail "Accessibility Bridge not bound after open_app task-stack test"
+
 # Verify Back by destination, not merely by performGlobalAction() returning true.
 # Put Settings behind MyAI, dispatch Back through the real ToolExecutor path, and
 # assert that Android actually returns to Settings rather than the launcher/home.
