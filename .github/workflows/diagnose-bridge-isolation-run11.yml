@@ -1,9 +1,9 @@
-name: Run 12 - Isolate Back Navigation
+name: Run 13 - Fail-Closed Back Diagnostics
 
 on:
   push:
     branches:
-      - diagnostic/back-navigation-run12
+      - diagnostic/back-navigation-run13
   workflow_dispatch:
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
       - name: Upload diagnostic APK for isolated emulator jobs
         uses: actions/upload-artifact@v4
         with:
-          name: myai-run12-debug-apk
+          name: myai-run13-debug-apk
           path: MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -70,15 +70,15 @@ jobs:
       - name: Download diagnostic APK
         uses: actions/download-artifact@v4
         with:
-          name: myai-run12-debug-apk
-          path: run12-apk
+          name: myai-run13-debug-apk
+          path: run13-apk
 
       - name: Place APK at expected path
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
-          APK="$(find run12-apk -type f -name app-debug.apk -print -quit)"
+          APK="$(find run13-apk -type f -name app-debug.apk -print -quit)"
           test -n "$APK"
           cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
 
@@ -97,8 +97,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: myai-bridge-isolation-run-11-control
-          path: test-bridge/android-evidence/run12-control/
+          name: myai-back-run13-control
+          path: test-bridge/android-evidence/run13-control/
           if-no-files-found: warn
           retention-days: 30
 
@@ -114,15 +114,15 @@ jobs:
       - name: Download diagnostic APK
         uses: actions/download-artifact@v4
         with:
-          name: myai-run12-debug-apk
-          path: run12-apk
+          name: myai-run13-debug-apk
+          path: run13-apk
 
       - name: Place APK at expected path
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug
-          APK="$(find run12-apk -type f -name app-debug.apk -print -quit)"
+          APK="$(find run13-apk -type f -name app-debug.apk -print -quit)"
           test -n "$APK"
           cp "$APK" MyAI_Infinix_v0.1.0_ALPHA/app/build/outputs/apk/debug/app-debug.apk
 
@@ -141,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: myai-bridge-isolation-run-11-tool-smoke
+          name: myai-back-run13-tool-smoke
           path: test-bridge/android-evidence/
           if-no-files-found: warn
           retention-days: 30
