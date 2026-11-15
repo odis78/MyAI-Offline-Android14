@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
         launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         PackageManager packageManager = getPackageManager();
         java.util.List<ResolveInfo> launchableApps =
-                packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY);
+                packageManager.queryIntentActivities(launcherIntent, 0);
         java.util.List<ResolveInfo> visibleApps = new java.util.ArrayList<>();
         for (ResolveInfo info : launchableApps) {
             if (info.activityInfo != null
