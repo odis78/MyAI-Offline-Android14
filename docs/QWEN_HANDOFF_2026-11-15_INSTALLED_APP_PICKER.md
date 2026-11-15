@@ -16,7 +16,7 @@ Continue real development and provide complete technical context for Qwen. The i
 - Do not touch Realme, REA Android, Termux REA, Tunnel Client, or REA-Termux-Bridge.
 
 ## Implemented behavior
-A new "Приложения" button opens an Android dialog containing apps that expose a launcher activity (MAIN + LAUNCHER). The list is sorted alphabetically by visible app label. The user explicitly selects one app. MyAI then dispatches the existing open_app tool with that app's package name through ToolAgent -> ToolExecutor -> PackageManager.getLaunchIntentForPackage. Result is written to chat and diagnostic log.
+A new "Приложения" button opens an Android dialog containing apps that expose a launcher activity (MAIN + LAUNCHER). Chat phrases "открой галерею", "открой фото", and "открой фотографии" now open the same picker rather than guessing a package name. The list is sorted alphabetically by visible app label. The user explicitly selects one app. MyAI then dispatches the existing open_app tool with that app's package name through ToolAgent -> ToolExecutor -> PackageManager.getLaunchIntentForPackage. Result is written to chat and diagnostic log.
 
 This is a user-selected launch, not automatic app guessing and not background automation.
 
@@ -37,6 +37,7 @@ No QUERY_ALL_PACKAGES permission was added. The feature enumerates only launcher
    - Added showInstalledApps(): query MAIN/LAUNCHER, exclude own package, sort labels, show selection dialog.
    - Added launchSelectedApp(): dispatch existing open_app through the single-thread command executor; publish result.
    - JSON package argument uses JSONObject.quote to avoid unchecked/checked JSON construction issue.
+   - Gallery/photo command phrases route to the picker; startup help mentions the new button and command.
 3. MyAI_Infinix_v0.1.0_ALPHA/sanity_check.sh
    - Checks appPicker ID and handler.
    - Checks launcher query and manifest MAIN/LAUNCHER declarations.
