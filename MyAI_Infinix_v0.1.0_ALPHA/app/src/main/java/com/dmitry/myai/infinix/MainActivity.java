@@ -55,7 +55,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.testTool).setOnClickListener(v -> runTool("{\"tool\":\"home\",\"args\":{}}"));
         MyAiAccessibilityService.addConnectionListener(connectionListener);
         updateBridgeStatus();
-        addChat("MyAI", "Чат команд готов. Примеры: «назад», «домой», «прокрути вниз», «прочитай экран», «открой YouTube». Для управления телефоном включи службу специальных возможностей.");
+        addChat("MyAI", "Чат команд готов. Примеры: «назад», «домой», «прокрути вниз», «прочитай экран», «открой YouTube», «открой галерею». Кнопка «Приложения» открывает список установленных приложений. Для управления телефоном включи службу специальных возможностей.");
         android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onCreate hasExtra=" + getIntent().hasExtra("myai_test_tool"));
         scheduleSmokeTool(getIntent());
     }
@@ -178,8 +178,10 @@ public class MainActivity extends Activity {
             json = tool("open_app", "{\"package\":\"com.android.chrome\"}");
         } else if (lower.contains("открой настройки") || lower.contains("открой settings")) {
             json = tool("open_app", "{\"package\":\"com.android.settings\"}");
-        } else if (lower.contains("открой галерею")) {
-            addChat("MyAI", "Пока не могу надёжно определить пакет галереи на этом телефоне. Следующим шагом добавим выбор приложений по установленному списку.");
+        } else if (lower.contains("открой галерею") || lower.contains("открой фото")
+                || lower.contains("открой фотографии")) {
+            addChat("MyAI", "Выбери приложение галереи или фотографий из списка.");
+            showInstalledApps();
             return;
         } else {
             addChat("MyAI", "Пока не распознал команду. Сейчас поддерживаются: «домой», «назад», «прокрути вниз/вверх», «прочитай экран», «открой YouTube», «открой Chrome», «открой настройки». Это базовый командный маршрутизатор, не подключённая языковая модель.");
