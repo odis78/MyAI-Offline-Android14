@@ -18,11 +18,25 @@
         android:paddingTop="4dp"
         android:text="Control Bridge: проверка..." />
 
-    <Button
-        android:id="@+id/accessibility"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Открыть специальные возможности" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/accessibility"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Спец. возможности" />
+
+        <Button
+            android:id="@+id/appPicker"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Приложения" />
+    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -61,8 +75,6 @@
             android:layout_height="wrap_content"
             android:text="Отправить" />
     </LinearLayout>
-
-
 
     <TextView
         android:layout_width="match_parent"
