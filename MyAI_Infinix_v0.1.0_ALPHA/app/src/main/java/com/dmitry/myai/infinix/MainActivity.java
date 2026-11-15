@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
         commandExecutor.execute(() -> {
             try {
                 var result = agent.dispatchJson(tool("open_app",
-                        new JSONObject().put("package", packageName).toString()));
+                        "{\"package\":" + JSONObject.quote(packageName) + "}"));
                 String message = result.tool + ": "
                         + (result.success ? "OK — " : "Ошибка — ") + result.message;
                 addChat("MyAI", message);
