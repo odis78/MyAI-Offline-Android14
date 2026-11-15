@@ -6,6 +6,7 @@ on:
     branches:
       - infinix
       - rebuild-run104-signed-apk
+      - feature/infinix-installed-app-picker
 
 permissions:
   contents: read
