@@ -47,7 +47,7 @@ grep -Fq 'GLOBAL_ACTION_BACK' "$SERVICE"
 grep -Fq 'GLOBAL_ACTION_HOME' "$SERVICE"
 grep -Fq 'dispatchGesture' "$SERVICE"
 
-for id in status log accessibility testHome testBack testScroll testScrollUp testScreen testTool logScroll; do
+for id in status log accessibility appPicker testHome testBack testScroll testScrollUp testScreen testTool logScroll; do
   grep -Fq "@+id/$id" "$R/app/src/main/res/layout/activity_main.xml"
   grep -Fq "R.id.$id" "$R/app/src/main/java/com/dmitry/myai/infinix/MainActivity.java"
 done
@@ -87,3 +87,8 @@ grep -Fq 'scroll_down' "$R/app/src/main/java/com/dmitry/myai/infinix/safety/Poli
 grep -Fq 'new JSONObject(json)' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolProtocol.java"
 grep -Fq 'node.recycle()' "$R/app/src/main/java/com/dmitry/myai/infinix/tools/ToolExecutor.java"
 grep -Fq 'dispatchJson' "$R/app/src/main/java/com/dmitry/myai/infinix/agent/AgentContracts.java"
+grep -Fq 'queryIntentActivities' "$R/app/src/main/java/com/dmitry/myai/infinix/MainActivity.java"
+grep -Fq 'R.id.appPicker' "$R/app/src/main/java/com/dmitry/myai/infinix/MainActivity.java"
+grep -Fq 'android.intent.action.MAIN' "$MANIFEST"
+grep -Fq 'android.intent.category.LAUNCHER' "$MANIFEST"
+if grep -Fq 'android.permission.QUERY_ALL_PACKAGES' "$MANIFEST"; then echo "Broad package visibility permission is forbidden"; exit 1; fi
