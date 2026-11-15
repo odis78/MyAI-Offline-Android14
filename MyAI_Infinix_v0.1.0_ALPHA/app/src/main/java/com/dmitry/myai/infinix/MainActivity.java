@@ -1,7 +1,10 @@
 package com.dmitry.myai.infinix;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -38,6 +41,7 @@ public class MainActivity extends Activity {
 
         findViewById(R.id.accessibility).setOnClickListener(v ->
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        findViewById(R.id.appPicker).setOnClickListener(v -> showInstalledApps());
         findViewById(R.id.sendCommand).setOnClickListener(v -> submitCommand());
         commandInput.setOnEditorActionListener((v, actionId, event) -> {
             submitCommand();
@@ -79,6 +83,74 @@ public class MainActivity extends Activity {
         android.util.Log.i("MyAI-Infinix", "SMOKE_LIFECYCLE onNewIntent hasExtra="
                 + (intent != null && intent.hasExtra("myai_test_tool")));
         scheduleSmokeTool(intent);
+    }
+
+    /**
+     * Lists only apps that expose a launcher activity. AndroidManifest declares
+     * the matching MAIN/LAUNCHER query, so no broad QUERY_ALL_PACKAGES permission
+     * is needed. Selecting an item routes through the existing open_app tool.
+     */
+    private void showInstalledApps() {
+        Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        PackageManager packageManager = getPackageManager();
+        java.util.List<ResolveInfo> launchableApps =
+                packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY);
+        java.util.List<ResolveInfo> visibleApps = new java.util.ArrayList<>();
+        for (ResolveInfo info : launchableApps) {
+            if (info.activityInfo != null
+                    && !getPackageName().equals(info.activityInfo.packageName)) {
+                visibleApps.add(info);
+            }
+        }
+        java.util.Collections.sort(visibleApps, (left, right) ->
+                String.CASE_INSENSITIVE_ORDER.compare(
+                        String.valueOf(left.loadLabel(packageManager)),
+                        String.valueOf(right.loadLabel(packageManager))));
+
+        if (visibleApps.isEmpty()) {
+            Toast.makeText(this, "Не найдено приложений с ярлыком запуска", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        CharSequence[] labels = new CharSequence[visibleApps.size()];
+        for (int i = 0; i < visibleApps.size(); i++) {
+            ResolveInfo info = visibleApps.get(i);
+            labels[i] = info.loadLabel(packageManager);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Выбери приложение для запуска")
+                .setItems(labels, (dialog, which) -> {
+                    ResolveInfo selected = visibleApps.get(which);
+                    if (selected.activityInfo == null) return;
+                    String packageName = selected.activityInfo.packageName;
+                    String label = String.valueOf(selected.loadLabel(packageManager));
+                    launchSelectedApp(packageName, label);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void launchSelectedApp(String packageName, String label) {
+        addChat("Вы", "Открыть приложение: " + label);
+        commandExecutor.execute(() -> {
+            try {
+                var result = agent.dispatchJson(tool("open_app",
+                        new JSONObject().put("package", packageName).toString()));
+                String message = result.tool + ": "
+                        + (result.success ? "OK — " : "Ошибка — ") + result.message;
+                addChat("MyAI", message);
+                append(message);
+                android.util.Log.i("MyAI-Infinix", "APP_PICKER " + label
+                        + " package=" + packageName + " success=" + result.success);
+            } catch (Exception e) {
+                String message = "Не удалось открыть " + label + ": "
+                        + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                addChat("MyAI", message);
+                append(message);
+            }
+        });
     }
 
     private void submitCommand() {
